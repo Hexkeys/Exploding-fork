@@ -235,15 +235,12 @@ function runBotTurn(room){
       bot.hand=bot.hand.filter(x=>x.id!==c.id);
       room.discard.push({...c,id:newId()});
       if(c.type==='skip'){
-        addLog(room,'Quantum Bot played Skip.');
-        advanceTurn(room,1);
+        addLog(room,'Quantum Bot played Skip. Its turn continues until it draws.');
       }else if(c.type==='double'){
-        addLog(room,'Quantum Bot played Double Turn.');
-        room.round++;
-        room.updatedAt=Date.now();
+        addLog(room,'Quantum Bot played Double Turn. Its turn continues until it draws.');
+        touch(room);
       }else if(c.type==='deflect'){
-        addLog(room,'Quantum Bot played Deflect.');
-        advanceTurn(room,2);
+        addLog(room,'Quantum Bot played Deflect. Its turn continues until it draws.');
       }else if(c.type==='steal'){
         if(target?.hand.length){
           const i=Math.floor(Math.random()*target.hand.length);
@@ -252,11 +249,11 @@ function runBotTurn(room){
         }else addLog(room,'Quantum Bot found nothing to steal.');
       }else if(c.type==='lucky'){
         const result=drawAndResolve(room,bot);
-        if(!result.eliminated)advanceTurn(room,1);
+        if(result.card&&!result.eliminated)advanceTurn(room,1);
       }else{
         const safe=safeDraw(room,bot);
         addLog(room,safe?'Quantum Bot used Safe Bite for a guaranteed safe draw.':'Quantum Bot used Safe Bite, but no safe card was available.');
-        advanceTurn(room,1);
+        if(safe)advanceTurn(room,1);
       }
     }else{
       const result=drawAndResolve(room,bot);
@@ -353,11 +350,11 @@ app.post('/api/rooms/:code/play',(req,res)=>{
     }else addLog(room,player.name+' tried to grab a card, but found nothing.');
   }else if(c.type==='lucky'){
     const result=drawAndResolve(room,player);
-    if(!result.eliminated)advanceTurn(room,1);
+    if(result.card&&!result.eliminated)advanceTurn(room,1);
   }else if(c.type==='safe'){
     const safe=safeDraw(room,player);
     addLog(room,safe?player.name+' used Safe Bite for a guaranteed safe draw.':player.name+' used Safe Bite, but no safe card was available.');
-    advanceTurn(room,1);
+    if(safe)advanceTurn(room,1);
   }
   res.json(publicState(room,player.id,player.token));
 });
