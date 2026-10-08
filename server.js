@@ -217,7 +217,7 @@ app.post('/api/rooms/:code/bot-turn',(req,res)=>{
   if(!room||!room.started)return res.status(400).json({error:'Game is not active.'});
   if(!room.players[room.turn]?.bot)return res.status(400).json({error:'It is not the bot turn.'});
   runBotTurn(room);
-  res.json(publicState(room));
+  res.json(publicState(room,String(req.body?.playerId||'')));
 });
 
 app.post('/api/rooms',(req,res)=>{
