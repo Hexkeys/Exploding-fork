@@ -28,7 +28,7 @@ main{max-width:980px;margin:34px auto;padding:0 18px}.hero{border:1px solid var(
 
 <section id="home" class="screen active">
 <div class="hero"><div class="dim">// PRIVATE FRIEND NETWORK</div><h2>QUANTUM<br><span>FORK</span><br>NODE.</h2><p>A quick multiplayer card battle where every draw could be your last. Play clever utility cards, dodge Fork Bombs, and be the last player holding the table together.</p><div class="actions"><button class="primary" onclick="show('create')">+ CREATE PARTY</button><button class="secondary" onclick="show('join')">+ JOIN PARTY</button><button class="secondary" onclick="show('bot')">+ PLAY WITH BOT</button></div></div>
-<div class="sectionBlock"><div class="dim">// FORK SIMULATION</div><div class="rules"><div class="rule">🛡️ <div><b>Shield the boom</b><small>Block a Fork Bomb and send it back into the deck.</small></div></div><div class="rule">👀 <div><b>Play your hand</b><small>Skip, deflect, scan, steal, or gamble for an extra draw.</small></div></div><div class="rule">🏆 <div><b>Last fork standing</b><small>Survive until everyone else hits a bomb.</small></div></div></div></div></div>
+<div class="sectionBlock"><div class="dim">// FORK SIMULATION</div><div class="rules"><div class="rule">🛡️ <div><b>Defuse the boom</b><small>Block a Fork Bomb and send it back into the deck.</small></div></div><div class="rule">👀 <div><b>Play your hand</b><small>Skip, deflect, scan, steal, or gamble for an extra draw.</small></div></div><div class="rule">🏆 <div><b>Last fork standing</b><small>Survive until everyone else hits a bomb.</small></div></div></div></div></div>
 <div class="footer">EXPLODING FORK // ORIGINAL QUANTUM-THEMED GAME SIMULATOR</div>
 </section>
 
@@ -137,7 +137,7 @@ async function playCard(id){
   finally{actionBusy=false}
 }
 function seatClass(i,count){const maps={2:['seat','seat'],3:['seat','seat','seat'],4:['seat','seat','seat','seat'],5:['seat','seat','seat','seat','seat'],6:['seat','seat','seat','seat','seat','seat']};return maps[count]?.[i]||'seat'}
-function cardInfo(t){return ({bomb:['Fork Bomb','Reveals the dangerous card. A Defuse can save you.'],shield:['Defuse','Blocks a Fork Bomb when you draw one.'],skip:['Skip','End your turn without drawing.'],double:['Double Turn','Take another turn immediately.'],peek:['Peek','Inspect the danger ahead.'],deflect:['Deflect','Skip the next player and pass the turn.'],steal:['Steal','Take one random card from the next player.'],lucky:['Lucky Fork','Draw one extra card.'],safe:['Safe Bite','Play this utility card before your next draw.']})[t]||[t,'Utility card']}
+function cardInfo(t){return ({bomb:['Fork Bomb','Reveals the dangerous card. A Defuse can save you.'],defuse:['Defuse','Blocks a Fork Bomb when you draw one.'],skip:['Skip','End your turn without drawing.'],double:['Double Turn','Take another turn immediately.'],peek:['Peek','Inspect the danger ahead.'],deflect:['Deflect','Skip the next player and pass the turn.'],steal:['Steal','Take one random card from the next player.'],lucky:['Lucky Fork','Draw one extra card.'],safe:['Safe Bite','Play this utility card before your next draw.']})[t]||[t,'Utility card']}
 function render(){
   if(!state)return;
   $('roomPill').textContent=code?'TABLE '+code:'NO TABLE';
@@ -162,7 +162,7 @@ function render(){
 
   $('hand').innerHTML=me?me.hand.map(c=>{
     const info=cardInfo(c.type);
-    const disabled=c.type==='shield'||c.type==='bomb';
+    const disabled=c.type==='defuse'||c.type==='bomb';
     const action=disabled?'':' onclick="playCard(\''+c.id+'\')"';
     return '<button class="card '+(c.type==='bomb'?'danger':'')+'"'+action+(disabled?' disabled':'')+'>'+
       '<span class="tag">'+esc(c.label)+'</span>'+
