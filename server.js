@@ -232,7 +232,7 @@ app.post('/api/rooms/:code/draw',(req,res)=>{
     const shield=p.hand.findIndex(x=>x.type==='shield');
     if(shield>=0){p.hand.splice(shield,1);p.hand.pop();room.discard.push(c);addLog(room,p.name+' found a Fork Bomb and used a Shield.');const at=Math.floor(Math.random()*(room.deck.length+1));room.deck.splice(at,0,{...c,id:crypto.randomUUID()});}
     else{p.hand.pop();room.discard.push(c);addLog(room,p.name+' hit the Fork Bomb and is out.');room.players.splice(room.turn,1);if(room.players.length===1){room.winner=room.players[0].name;room.started=false;addLog(room,room.winner+' wins the fork!');}else if(room.turn>=room.players.length)room.turn=0;res.json(publicState(room));return;}
-  }else{addLog(room,p.name+' drew '+c.name+'.');room.discard.push(c);}
+  }else{addLog(room,p.name+' drew '+c.name+'.');}
   nextTurn(room,1);res.json(publicState(room));
 });
 app.post('/api/rooms/:code/play',(req,res)=>{
