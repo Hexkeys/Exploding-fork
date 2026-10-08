@@ -137,7 +137,7 @@ body.bomb-screen-shake .wrap{animation:bombScreenShake .68s cubic-bezier(.36,.07
 
 <section id="lobby" class="screen"><div class="panel"><div class="bar"><div><h2>// QUANTUM LOBBY</h2><div class="small">Broadcast this code to your crew.</div></div><button class="secondary" onclick="leaveSession()">Leave</button></div><div class="code" id="code"></div><div class="players" id="lobbyPlayers"></div><button class="primary" id="launchPartyBtn" onclick="launchParty()">INITIALIZE FORK</button><div class="small" id="partyLeaderNote" style="margin-top:12px">The PARTY LEADER starts the game. 2–6 players.</div></div></section>
 
-<section id="game" class="screen"><div class="gamegrid"><div class="sectionBlock table"><div class="bar"><div><h2>[ QUANTUM // TABLE ]</h2><div class="small">Round <span id="round">1</span></div></div><button class="secondary" onclick="leaveSession()">Exit</button></div><div class="game-status"><span id="turnText" class="turn-live">Waiting…</span><span id="deckText">Deck: 0</span></div><div class="board"><div id="tableSeats" class="table-seats"></div><button class="table-center deck-button" id="deckVisual" onclick="drawCard()" aria-label="Draw a card"><span class="deck-stack"><i></i><i></i><i></i><b>?</b></span><span class="deck-mark">QUANTUM DECK</span><span class="deck-count" id="deckCountBig">0</span><span class="small">cards remaining</span></button></div><div class="actions"><button class="primary" id="drawBtn" onclick="drawCard()">DRAW A CARD</button></div><div id="eliminatedNote" class="eliminated-note">YOU ARE OUT — watch the remaining players.</div></div><div class="sectionBlock hand-panel"><div class="sectionHeader"><div><div class="dim">// PLAYER // HAND</div><h3 style="margin:4px 0">YOUR CARDS</h3></div><div class="me-mark">ME</div></div><div class="hand-hud"><span class="small">Scroll to browse</span><span id="handPulse" class="hand-pulse">ME // +1 CARD</span></div><div class="hand-rail"><div class="hand-wrap"><div class="small">Play a utility card before drawing.</div><div class="hand" id="hand"></div></div></div><div class="small" style="margin-top:12px">Defuse is automatic. Bombs resolve on draw.</div></div><aside class="side"><div class="sectionBlock"><div class="sectionHeader"><div><div class="dim">// LIVE GAME FEED</div><h3>TABLE TRANSMISSIONS</h3></div></div><div class="log" id="log"></div></div><div class="sectionBlock"><h3>// CARD GUIDE</h3><div class="small">Play utility cards freely before drawing. Drawing a card ends your turn. Defuse blocks a Fork Bomb. Skip is discarded without drawing. Double Turn and Deflect can be played before the draw. Steal takes a random card. Lucky Fork and Safe Bite draw immediately.</div></div></aside></div><div id="fxLayer" class="fx-layer"></div></section>
+<section id="game" class="screen"><div class="gamegrid"><div class="sectionBlock table"><div class="bar"><div><h2>[ QUANTUM // TABLE ]</h2><div class="small">Round <span id="round">1</span></div></div><button class="secondary" onclick="leaveSession()">Exit</button></div><div class="game-status"><span id="turnText" class="turn-live">Waiting…</span><span id="deckText">Deck: 0</span></div><div class="board"><div id="tableSeats" class="table-seats"></div><button class="table-center deck-button" id="deckVisual" onclick="drawCard()" aria-label="Draw a card"><span class="deck-stack"><i></i><i></i><i></i><b>?</b></span><span class="deck-mark">QUANTUM DECK</span><span class="deck-count" id="deckCountBig">0</span><span class="small">cards remaining</span></button></div><div class="actions"><button class="primary" id="drawBtn" onclick="drawCard()">DRAW A CARD</button></div><div id="eliminatedNote" class="eliminated-note">YOU ARE OUT — watch the remaining players.</div></div><div class="sectionBlock hand-panel"><div class="sectionHeader"><div><div class="dim">// PLAYER // HAND</div><h3 style="margin:4px 0">YOUR CARDS</h3></div><div class="me-mark">ME</div></div><div class="hand-hud"><span class="small">Scroll to browse</span><span id="handPulse" class="hand-pulse">ME // +1 CARD</span></div><div class="hand-rail"><div class="hand-wrap"><div class="small">Play a utility card before drawing.</div><div class="hand" id="hand"></div></div></div><div class="small" style="margin-top:12px">Defuse is automatic. Bombs resolve on draw.</div></div><aside class="side"><div class="sectionBlock"><div class="sectionHeader"><div><div class="dim">// LIVE GAME FEED</div><h3>TABLE TRANSMISSIONS</h3></div></div><div class="log" id="log"></div></div><div class="sectionBlock"><h3>// CARD GUIDE</h3><div class="small">Drawing a card ends your turn. Skip passes to the next player; Deflect skips a player. Other utility cards can be played without automatically ending your turn. Lucky Fork and Safe Bite draw immediately.</div></div></aside></div><div id="fxLayer" class="fx-layer"></div></section>
 <div id="toast" class="toast"></div>
 </main></div>
 <script>let roomCode='',playerId='',playerToken='',state=null,partyCode='',partyMemberId='',partyLeader=false,pollBusy=false,actionBusy=false;
@@ -413,11 +413,20 @@ async function drawCard(){
   }catch(e){toast(e.message)}
   finally{actionBusy=false}
 }
+function shoveSeat(id){
+  const seat=$('tableSeats')?.querySelector('[data-player-id="'+id+'"]');
+  if(!seat)return;
+  seat.classList.remove('seat-shove');void seat.offsetWidth;seat.classList.add('seat-shove');
+  setTimeout(()=>seat.classList.remove('seat-shove'),700);
+}
 async function playCard(id){
   if(actionBusy||!playerId||!roomCode)return;
   const card=getOwnCards().find(c=>c.id===id);
   const from=findHandCardEl(id);
   const fromRect=from?.getBoundingClientRect()||null;
+  const playersBefore=state?.players||[],turnBefore=state?.turn??-1;
+  const turnTarget=card?.type==='skip'&&playersBefore.length?playersBefore[(turnBefore+1)%playersBefore.length]?.id:
+    card?.type==='deflect'&&playersBefore.length?playersBefore[(turnBefore+2)%playersBefore.length]?.id:null;
   actionBusy=true;
   try{
     state=await api('/api/rooms/'+roomCode+'/play',{method:'POST',body:JSON.stringify({playerId,cardId:id})});
@@ -425,15 +434,16 @@ async function playCard(id){
     if(card&&fromRect)requestAnimationFrame(()=>animateCardFlight(card,null,$('deckVisual'),'play',fromRect));
     const reaction=reactionFor(card?.type);
     if(reaction)showReaction(reaction[0],reaction[1]);
+    if(turnTarget)shoveSeat(turnTarget);
   }catch(e){toast(e.message)}
   finally{actionBusy=false}
 }
 function cardInfo(t){return ({
   bomb:['Fork Bomb','Reveals the dangerous card. Your Defuse can save you.'],
   defuse:['Defuse','Automatically blocks a Fork Bomb when you draw one.'],
-  skip:['Skip','Discard it without drawing. Your turn continues.'],
+  skip:['Skip','Pass the turn to the next player.'],
   double:['Double Turn','Play it before drawing. It does not end your turn.'],
-  deflect:['Deflect','Play it before drawing. Your turn continues.'],
+  deflect:['Deflect','Skip the next player, then pass the turn.'],
   steal:['Steal','Take one random card from the next player.'],
   lucky:['Lucky Fork','Draw one extra card, with normal bomb/Defuse rules.'],
   safe:['Safe Bite','Take a guaranteed safe card, then end your turn.']
