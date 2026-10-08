@@ -255,7 +255,8 @@ async function pollGame(){
   }
 }
 async function restoreSession(){
-  const raw=localStorage.getItem(SESSION_KEY);
+  let raw='';
+  try{raw=localStorage.getItem(SESSION_KEY)||''}catch{return}
   if(!raw)return;
   try{
     const saved=JSON.parse(raw);
@@ -263,12 +264,12 @@ async function restoreSession(){
     partyCode=saved.partyCode||'';partyMemberId=saved.partyMemberId||'';partyLeader=!!saved.partyLeader;
     if(partyCode&&!roomCode){show('lobby');await refreshParty()}
     else if(roomCode){show('game');await refresh()}
-  }catch(e){clearSession()}
+  }catch{clearSession()}
 }
 async function boot(){
   await restoreSession();
   setInterval(pollGame,1500);
   pollGame();
 }
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=8');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=9');
 boot();</script></body></html>
