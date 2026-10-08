@@ -13,7 +13,6 @@ const cards=[
   ['Fork Bomb','BOOM','bomb'],['Fork Bomb','BOOM','bomb'],['Fork Bomb','BOOM','bomb'],
   ['Defuse','SAVE','defuse'],['Defuse','SAVE','defuse'],['Defuse','SAVE','defuse'],['Defuse','SAVE','defuse'],
   ['Deflect','TURN','deflect'],['Deflect','TURN','deflect'],['Deflect','TURN','deflect'],
-  ['Peek','SCAN','peek'],['Peek','SCAN','peek'],['Peek','SCAN','peek'],
   ['Steal','GRAB','steal'],['Steal','GRAB','steal'],['Steal','GRAB','steal'],
   ['Skip','PASS','skip'],['Skip','PASS','skip'],['Skip','PASS','skip'],
   ['Double Turn','2X','double'],['Double Turn','2X','double'],
@@ -233,7 +232,7 @@ function runBotTurn(room){
   touch(room);
   try{
     const target=room.players.find(p=>!p.bot);
-    const playable=bot.hand.filter(c=>['skip','double','deflect','peek','steal','lucky','safe'].includes(c.type));
+    const playable=bot.hand.filter(c=>['skip','double','deflect','steal','lucky','safe'].includes(c.type));
     if(playable.length&&Math.random()<0.65){
       const c=playable[Math.floor(Math.random()*playable.length)];
       bot.hand=bot.hand.filter(x=>x.id!==c.id);
