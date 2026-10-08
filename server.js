@@ -95,7 +95,7 @@ function eliminatePlayer(room,index){
   const p=room.players[index];
   if(!p)return;
   room.eliminated=room.eliminated||{};
-  room.eliminated[p.id]={id:p.id,token:p.token,name:p.name,bot:!!p.bot,hand:[],lastPeek:null,privateLog:[...(p.privateLog||[])]};
+  room.eliminated[p.id]={id:p.id,token:p.token,name:p.name,bot:!!p.bot,hand:[],privateLog:[...(p.privateLog||[])]};
   room.players.splice(index,1);
   if(room.players.length===1){
     room.winner=room.players[0].name;
@@ -114,7 +114,6 @@ function eliminatePlayer(room,index){
 function drawAndResolve(room,p){
   const card=draw(room,p);
   if(!card)return {card:null,eliminated:false,defused:false};
-  p.lastPeek=null;
   if(card.type!=='bomb')return {card,eliminated:false,defused:false};
   const defuseIndex=p.hand.findIndex(c=>c.type==='defuse');
   if(defuseIndex>=0){
@@ -139,7 +138,7 @@ function safeDraw(room,p){
   return card;
 }
 function createPlayer(name,bot=false){
-  return {id:newId(),token:newToken(),name:cleanName(name),bot,hand:[],lastPeek:null,privateLog:[]};
+  return {id:newId(),token:newToken(),name:cleanName(name),bot,hand:[],privateLog:[]};
 }
 function authorizePlayer(room,req,playerIdField='playerId'){
   const playerId=String(req.body?.[playerIdField]||req.query?.playerId||'');
@@ -209,7 +208,7 @@ app.post('/api/parties/:code/launch',(req,res)=>{
     party.roomCode=null;
   }
   const roomCode=makeCode();
-  const room={code:roomCode,partyCode:party.code,host:party.hostId,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,token:m.token,name:m.name,bot:false,hand:[],lastPeek:null,privateLog:[]})),deck:[],discard:[],eliminated:{},log:[],updatedAt:Date.now(),botThinking:false};
+  const room={code:roomCode,partyCode:party.code,host:party.hostId,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,token:m.token,name:m.name,bot:false,hand:[],privateLog:[]})),deck:[],discard:[],eliminated:{},log:[],updatedAt:Date.now(),botThinking:false};
   rooms.set(roomCode,room);
   startGame(room);
   party.roomCode=roomCode;
@@ -340,20 +339,11 @@ app.post('/api/rooms/:code/play',(req,res)=>{
   if(idx<0)return res.status(404).json({error:'Card not found.'});
   const c=player.hand.splice(idx,1)[0];
   if(c.type==='defuse'||c.type==='bomb')return res.status(400).json({error:'That card is reactive or drawn automatically.'});
-  player.lastPeek=null;
   room.discard.push({...c,id:newId()});
   if(c.type==='skip'){
     addLog(room,player.name+' played Skip.');advanceTurn(room,1);
   }else if(c.type==='double'){
-    addLog(room,player.name+' played Double Turn.');room.round++;touch(room);
-  }else if(c.type==='peek'){
-    const top=room.deck.at(-1);
-    player.lastPeek=top?{name:top.name,label:top.label,type:top.type}:null;
-    player.privateLog=player.privateLog||[];
-    player.privateLog.push(top?'PEEK // '+top.name+' ['+top.label+']':'PEEK // EMPTY DECK');
-    addLog(room,player.name+' scanned the mystery fork.');
-    advanceTurn(room,1);
-  }else if(c.type==='deflect'){
+    addLog(room,player.name+' played Double Turn.');room.round++;touch(room); }else if(c.type==='deflect'){
     addLog(room,player.name+' deflected the danger.');advanceTurn(room,2);
   }else if(c.type==='steal'){
     const target=room.players[(room.turn+1)%room.players.length];
