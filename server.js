@@ -118,11 +118,7 @@ function drawAndResolve(room,p){
 }
 function safeDraw(room,p){
   if(!room.deck.length)refill(room);
-  let index=room.deck.findIndex(c=>c.type!=='bomb');
-  if(index<0 && room.discard.length){
-    refill(room);
-    index=room.deck.findIndex(c=>c.type!=='bomb');
-  }
+  const index=room.deck.findIndex(c=>c.type!=='bomb');
   if(index<0)return null;
   const card=room.deck.splice(index,1)[0];
   p.hand.push(card);
@@ -184,8 +180,8 @@ app.post('/api/parties/:code/launch',(req,res)=>{
   if(party.members.length<2)return res.status(400).json({error:'A party needs at least 2 players.'});
   if(party.roomCode){
     const room=rooms.get(party.roomCode);
-    if(!room)return res.status(409).json({error:'The party game is no longer available.'});
-    return res.json({code:room.code,started:room.started,state:publicState(room,member.id,member.token)});
+    if(room&&room.started)return res.json({code:room.code,started:true,state:publicState(room,member.id,member.token)});
+    party.roomCode=null;
   }
   const roomCode=makeCode();
   const room={code:roomCode,partyCode:party.code,host:party.hostId,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,token:m.token,name:m.name,bot:false,hand:[],lastPeek:null})),deck:[],discard:[],log:[],updatedAt:Date.now(),botThinking:false};
@@ -283,6 +279,7 @@ app.get('/api/rooms/:code',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));
   if(!room)return res.status(404).json({error:'Room not found.'});
   const player=authorizePlayer(room,req);
+  if(room.started&&!player)return res.status(403).json({error:'Player authorization failed.'});
   res.json(publicState(room,player?.id,player?.token));
 });
 app.post('/api/rooms/:code/start',(req,res)=>{
@@ -351,7 +348,10 @@ app.post('/api/rooms/:code/play',(req,res)=>{
 setInterval(()=>{
   const now=Date.now(),ttl=1000*60*60*6;
   for(const [code,room] of rooms)if(now-room.updatedAt>ttl)rooms.delete(code);
-  for(const [code,party] of parties)if(now-party.updatedAt>ttl&&!party.roomCode)parties.delete(code);
+  for(const [code,party] of parties){
+    if(party.roomCode&&!rooms.has(party.roomCode))party.roomCode=null;
+    if(now-party.updatedAt>ttl&&!party.roomCode)parties.delete(code);
+  }
 },60*1000);
 
 app.use((_req,res)=>res.sendFile(process.cwd()+'/public/index.html'));
