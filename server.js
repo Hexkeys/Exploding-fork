@@ -47,9 +47,16 @@ function publicParty(p){
   };
 }
 function publicState(room,viewerId=null,viewerToken=null){
+  const viewer=room.players.find(p=>p.id===viewerId&&p.token===viewerToken)||room.eliminated?.[viewerId];
+  const viewerActive=!!room.players.find(p=>p.id===viewerId&&p.token===viewerToken);
+  const viewerHand=viewerActive&&viewer
+    ? viewer.hand.map(c=>({id:c.id,name:c.name,label:c.label,type:c.type}))
+    : [];
   return {
     code:room.code,started:room.started,turn:room.turn,round:room.round,winner:room.winner,
     partyCode:room.partyCode,botThinking:!!room.botThinking,
+    viewerId:viewer?.id||null,viewerEliminated:!!room.eliminated?.[viewerId],
+    viewerHand,viewerPeek:(viewerActive&&viewer?.lastPeek)?viewer.lastPeek:null,
     players:room.players.map(p=>({
       id:p.id,name:p.name,bot:!!p.bot,isLeader:p.id===room.host,
       handCount:p.hand.length,
@@ -84,6 +91,10 @@ function reinsertBomb(room,bomb){
   room.deck.splice(at,0,copy);
 }
 function eliminatePlayer(room,index){
+  const p=room.players[index];
+  if(!p)return;
+  room.eliminated=room.eliminated||{};
+  room.eliminated[p.id]={id:p.id,token:p.token,name:p.name,bot:!!p.bot,hand:[],lastPeek:null};
   room.players.splice(index,1);
   if(room.players.length===1){
     room.winner=room.players[0].name;
@@ -93,6 +104,8 @@ function eliminatePlayer(room,index){
   }else if(room.players.length===0){
     room.started=false;
     room.botThinking=false;
+  }else if(room.turn>index){
+    room.turn--;
   }else if(room.turn>=room.players.length){
     room.turn=0;
   }
@@ -134,8 +147,18 @@ function authorizePlayer(room,req,playerIdField='playerId'){
   if(!player||!token||player.token!==token)return null;
   return player;
 }
+function authorizeViewer(room,req,playerIdField='playerId'){
+  const playerId=String(req.body?.[playerIdField]||req.query?.playerId||'');
+  const token=String(req.headers['x-player-token']||'');
+  if(!playerId||!token)return null;
+  const player=room.players.find(p=>p.id===playerId&&p.token===token);
+  if(player)return {player,active:true};
+  const eliminated=room.eliminated?.[playerId];
+  if(eliminated&&eliminated.token===token)return {player:eliminated,active:false};
+  return null;
+}
 function startGame(room){
-  room.started=true;room.round=1;room.turn=0;room.winner=null;room.discard=[];room.botThinking=false;room.updatedAt=Date.now();
+  room.started=true;room.round=1;room.turn=0;room.winner=null;room.discard=[];room.eliminated={};room.botThinking=false;room.updatedAt=Date.now();
   const playerCount=room.players.length;
   const pool=safeCardPool();
   const openingSafe=Array.from({length:playerCount*7},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
@@ -184,7 +207,7 @@ app.post('/api/parties/:code/launch',(req,res)=>{
     party.roomCode=null;
   }
   const roomCode=makeCode();
-  const room={code:roomCode,partyCode:party.code,host:party.hostId,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,token:m.token,name:m.name,bot:false,hand:[],lastPeek:null})),deck:[],discard:[],log:[],updatedAt:Date.now(),botThinking:false};
+  const room={code:roomCode,partyCode:party.code,host:party.hostId,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,token:m.token,name:m.name,bot:false,hand:[],lastPeek:null})),deck:[],discard:[],eliminated:{},log:[],updatedAt:Date.now(),botThinking:false};
   rooms.set(roomCode,room);
   startGame(room);
   party.roomCode=roomCode;
@@ -195,7 +218,7 @@ app.post('/api/parties/:code/launch',(req,res)=>{
 app.post('/api/bot-games',(req,res)=>{
   const human=createPlayer(req.body?.name||'Player');
   const bot=createPlayer('Quantum Bot',true);
-  const room={code:makeCode(),partyCode:null,host:human.id,started:false,turn:0,round:0,winner:null,players:[human,bot],deck:[],discard:[],log:[],updatedAt:Date.now(),botThinking:false};
+  const room={code:makeCode(),partyCode:null,host:human.id,started:false,turn:0,round:0,winner:null,players:[human,bot],deck:[],discard:[],eliminated:{},log:[],updatedAt:Date.now(),botThinking:false};
   rooms.set(room.code,room);
   startGame(room);
   addLog(room,'Quantum Bot is connected.');
@@ -262,7 +285,7 @@ app.post('/api/rooms/:code/bot-turn',(req,res)=>{
 app.post('/api/rooms',(req,res)=>{
   const player=createPlayer(req.body?.name||'Host');
   const code=makeCode();
-  const room={code,partyCode:null,host:player.id,started:false,turn:0,round:0,winner:null,players:[player],deck:[],discard:[],log:[],updatedAt:Date.now(),botThinking:false};
+  const room={code,partyCode:null,host:player.id,started:false,turn:0,round:0,winner:null,players:[player],deck:[],discard:[],eliminated:{},log:[],updatedAt:Date.now(),botThinking:false};
   rooms.set(code,room);
   res.status(201).json({code,id:player.id,token:player.token,state:publicState(room,player.id,player.token)});
 });
@@ -278,9 +301,9 @@ app.post('/api/rooms/:code/join',(req,res)=>{
 app.get('/api/rooms/:code',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));
   if(!room)return res.status(404).json({error:'Room not found.'});
-  const player=authorizePlayer(room,req);
-  if(room.started&&!player)return res.status(403).json({error:'Player authorization failed.'});
-  res.json(publicState(room,player?.id,player?.token));
+  const viewer=authorizeViewer(room,req);
+  if(room.started&&!viewer)return res.status(403).json({error:'Player authorization failed.'});
+  res.json(publicState(room,viewer?.player?.id,viewer?.player?.token));
 });
 app.post('/api/rooms/:code/start',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));
