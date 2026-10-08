@@ -62,7 +62,43 @@ async function drawCard(){try{state=await api('/api/rooms/'+code+'/draw',{method
 async function playCard(id){try{state=await api('/api/rooms/'+code+'/play',{method:'POST',body:JSON.stringify({playerId,cardId:id})});render()}catch(e){toast(e.message)}}
 function seatClass(i,count){const maps={2:['seat','seat'],3:['seat','seat','seat'],4:['seat','seat','seat','seat'],5:['seat','seat','seat','seat','seat'],6:['seat','seat','seat','seat','seat','seat']};return maps[count]?.[i]||'seat'}
 function cardInfo(t){return ({bomb:['Fork Bomb','Reveals the dangerous card. A Shield can save you.'],shield:['Shield','Blocks a Fork Bomb when you draw one.'],skip:['Skip','End your turn without drawing.'],double:['Double Turn','Take another turn immediately.'],peek:['Peek','Inspect the danger ahead.'],deflect:['Deflect','Skip the next player and pass the turn.'],steal:['Steal','Take one random card from the next player.'],lucky:['Lucky Fork','Draw one extra card.'],safe:['Safe Bite','Play this utility card before your next draw.']})[t]||[t,'Utility card']}
-function render(){if(!state)return;$('roomPill').textContent=code?'TABLE '+code:'NO TABLE';$('code').textContent=code;$('lobbyPlayers').innerHTML=state.players.map(p=>'<span class="player">'+esc(p.name)+'</span>').join('');$('round').textContent=state.round;$('deckText').textContent='Deck: '+state.deckCount;$('deckCountBig').textContent=state.deckCount;const me=state.players.find(p=>p.id===playerId);const current=state.players[state.turn];$('turnText').textContent=state.winner?'🏆 '+state.winner+' wins!':current?(current.id===playerId?'⚡ YOUR TURN':'Waiting for '+current.name):'Game over';$('drawBtn').disabled=!!state.winner||!current||current.id!==playerId;$('tableSeats').innerHTML=state.players.map((p,i)=>{const cls=seatClass(i,state.players.length)+(i===state.turn?' current':'')+(p.id===playerId?' me':'');return '<div class="'+cls+'"><div class="seat-name">'+esc(p.name)+(p.bot?' · BOT':'')+'</div><div class="seat-meta">'+p.hand.length+' cards</div>'+(i===state.turn?'<div class="seat-turn">● CURRENT TURN</div>':'')+(p.id===playerId?'<div class="seat-turn">YOU</div>':'')+'</div>'}).join('');$('hand').innerHTML=me?me.hand.map(c=>{const info=cardInfo(c.type);const disabled=c.type==='shield'||c.type==='bomb';return '<button class="card '+(c.type==='bomb'?'danger':'')+'" onclick="playCard(\\''+c.id+'\\')" '+(disabled?'disabled':'')+'><span class="tag">'+esc(c.label)+'</span><strong>'+esc(c.name)+'</strong><em>'+esc(info[1])+'</em><span class="what">'+(disabled?'AUTOMATIC / REACTIVE':'CLICK TO PLAY')+'</span></button>'}).join(''):'';$('log').innerHTML=state.log.map(x=>'<div>'+esc(x.text)+'</div>').join('');$('log').scrollTop=$('log').scrollHeight;if(state.started)show('game');else if(code)show('lobby');}
+function render(){
+  if(!state)return;
+  $('roomPill').textContent=code?'TABLE '+code:'NO TABLE';
+  $('code').textContent=code;
+  $('lobbyPlayers').innerHTML=state.players.map(p=>'<span class="player">'+esc(p.name)+'</span>').join('');
+  $('round').textContent=state.round;
+  $('deckText').textContent='Deck: '+state.deckCount;
+  $('deckCountBig').textContent=state.deckCount;
+  const me=state.players.find(p=>p.id===playerId);
+  const current=state.players[state.turn];
+  $('turnText').textContent=state.winner?'🏆 '+state.winner+' wins!':current?(current.id===playerId?'⚡ YOUR TURN':'Waiting for '+current.name):'Game over';
+  $('drawBtn').disabled=!!state.winner||!current||current.id!==playerId;
+
+  $('tableSeats').innerHTML=state.players.map((p,i)=>{
+    const cls=seatClass(i,state.players.length)+(i===state.turn?' current':'')+(p.id===playerId?' me':'');
+    return '<div class="'+cls+'"><div class="seat-name">'+esc(p.name)+(p.bot?' · BOT':'')+'</div><div class="seat-meta">'+p.hand.length+' cards</div>'+
+      (i===state.turn?'<div class="seat-turn">● CURRENT TURN</div>':'')+
+      (p.id===playerId?'<div class="seat-turn">YOU</div>':'')+
+      '</div>';
+  }).join('');
+
+  $('hand').innerHTML=me?me.hand.map(c=>{
+    const info=cardInfo(c.type);
+    const disabled=c.type==='shield'||c.type==='bomb';
+    const action=disabled?'':' onclick="playCard(\''+c.id+'\')"';
+    return '<button class="card '+(c.type==='bomb'?'danger':'')+'"'+action+(disabled?' disabled':'')+'>'+
+      '<span class="tag">'+esc(c.label)+'</span>'+
+      '<strong>'+esc(c.name)+'</strong>'+
+      '<em>'+esc(info[1])+'</em>'+
+      '<span class="what">'+(disabled?'AUTOMATIC / REACTIVE':'CLICK TO PLAY')+'</span>'+
+      '</button>';
+  }).join():'';
+
+  $('log').innerHTML=state.log.map(x=>'<div>'+esc(x.text)+'</div>').join('');
+  $('log').scrollTop=$('log').scrollHeight;
+  if(state.started)show('game');else if(code)show('lobby');
+}
 setInterval(async()=>{if(partyCode&&!state?.started)await refreshParty();else if(code)await refresh();if(state?.started&&state.players[state.turn]?.bot){try{state=await api('/api/rooms/'+code+'/bot-turn',{method:'POST',body:'{}'});render()}catch(e){}}},1200);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=3');
 </script></body></html>
