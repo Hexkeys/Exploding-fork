@@ -12,26 +12,30 @@
 <header class="top"><div class="brand"><div class="logo">🍴</div><div><h1>Exploding Fork</h1><p>QUANTUM-STYLE GAME HUB · ORIGINAL CARD SIMULATOR</p></div></div><div class="pill" id="roomPill">NO TABLE</div></header>
 
 <section id="home" class="screen active">
-<div class="hero"><div class="panel"><h2>DON'T<br><span>FORK</span><br>UP.</h2><p>A quick multiplayer card battle where every draw could be your last. Play clever utility cards, dodge Fork Bombs, and be the last player holding the table together.</p><div class="actions"><button class="primary" onclick="show('create')">Create table</button><button class="secondary" onclick="show('join')">Join a table</button></div></div>
+<div class="hero"><div class="panel"><h2>DON'T<br><span>FORK</span><br>UP.</h2><p>A quick multiplayer card battle where every draw could be your last. Play clever utility cards, dodge Fork Bombs, and be the last player holding the table together.</p><div class="actions"><button class="primary" onclick="show('create')">Create party</button><button class="secondary" onclick="show('join')">Join party</button></div></div>
 <div class="panel"><div class="rules"><div class="rule">🛡️ <div><b>Shield the boom</b><small>Block a Fork Bomb and send it back into the deck.</small></div></div><div class="rule">👀 <div><b>Play your hand</b><small>Skip, deflect, scan, steal, or gamble for an extra draw.</small></div></div><div class="rule">🏆 <div><b>Last fork standing</b><small>Survive until everyone else hits a bomb.</small></div></div></div></div></div>
 <div class="footer">Exploding Fork is an original game concept and is not affiliated with Exploding Kittens.</div>
 </section>
 
-<section id="create" class="screen"><div class="panel"><div class="bar"><h2>Create a table</h2><button class="secondary" onclick="show('home')">Back</button></div><div class="field"><label>YOUR NAME</label><input id="createName" maxlength="20" placeholder="Forkmaster"></div><button class="primary" onclick="createRoom()">Create & enter</button></div></section>
+<section id="create" class="screen"><div class="panel"><div class="bar"><h2>Create a party</h2><button class="secondary" onclick="show('home')">Back</button></div><div class="field"><label>PARTY NAME</label><input id="partyName" maxlength="24" placeholder="Friday Forks"></div><div class="field"><label>YOUR NAME</label><input id="createName" maxlength="20" placeholder="Forkmaster"></div><button class="primary" onclick="createParty()">Create party</button></div></section>
 
-<section id="join" class="screen"><div class="panel"><div class="bar"><h2>Join a table</h2><button class="secondary" onclick="show('home')">Back</button></div><div class="field"><label>YOUR NAME</label><input id="joinName" maxlength="20" placeholder="Your name"></div><div class="field"><label>4-CHARACTER TABLE CODE</label><input id="joinCode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"></div><button class="primary" onclick="joinRoom()">Join table</button></div></section>
+<section id="join" class="screen"><div class="panel"><div class="bar"><h2>Join a party</h2><button class="secondary" onclick="show('home')">Back</button></div><div class="field"><label>YOUR NAME</label><input id="joinName" maxlength="20" placeholder="Your name"></div><div class="field"><label>4-CHARACTER PARTY CODE</label><input id="joinCode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"></div><button class="primary" onclick="joinParty()">Join party</button></div></section>
 
-<section id="lobby" class="screen"><div class="panel"><div class="bar"><div><h2>Waiting room</h2><div class="small">Share this code with your friends.</div></div><button class="secondary" onclick="location.reload()">Leave</button></div><div class="code" id="code"></div><div class="players" id="lobbyPlayers"></div><button class="primary" onclick="startGame()">Start game</button><div class="small" style="margin-top:12px">Need at least 2 players. Up to 6 can join.</div></div></section>
+<section id="lobby" class="screen"><div class="panel"><div class="bar"><div><h2>Waiting room</h2><div class="small">Share this code with your friends.</div></div><button class="secondary" onclick="location.reload()">Leave</button></div><div class="code" id="code"></div><div class="players" id="lobbyPlayers"></div><button class="primary" onclick="launchParty()">Launch game</button><div class="small" style="margin-top:12px">2–6 players can play. Party codes are separate from game tables.</div></div></section>
 
 <section id="game" class="screen"><div class="gamegrid"><div class="panel table"><div class="bar"><div><h2>Fork table</h2><div class="small">Round <span id="round">1</span></div></div><button class="secondary" onclick="location.reload()">Exit</button></div><div class="status"><span id="turnText">Waiting…</span><span id="deckText">Deck: 0</span></div><div class="players" id="players"></div><div class="mystery">?</div><div class="actions"><button class="primary" id="drawBtn" onclick="drawCard()">Draw a card</button></div><h3 style="margin:22px 0 8px">Your hand</h3><div class="hand" id="hand"></div></div><aside class="side"><div class="panel"><h3>Table log</h3><div class="log" id="log"></div></div><div class="panel"><h3>How to win</h3><div class="small">Use your action cards before drawing. If you reveal a Fork Bomb, a Shield can save you. Otherwise you're out. The last player alive wins.</div></div></aside></div></section>
 <div id="toast" class="toast"></div>
 </div>
 <script>
-let code='',playerId='',state=null;
+let code='',playerId='',state=null,partyCode='',partyMemberId='';
 const $=id=>document.getElementById(id);
 function show(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));$(id).classList.add('active')}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
 async function api(url,opts={}){const r=await fetch(url,{headers:{'content-type':'application/json'},...opts});const d=await r.json();if(!r.ok)throw Error(d.error||'Something went wrong');return d}
+async function createParty(){try{const name=$('createName').value.trim()||'Forkmaster';const partyName=$('partyName').value.trim()||'Fork Party';const r=await api('/api/parties',{method:'POST',body:JSON.stringify({name:partyName,hostName:name})});partyCode=r.party.code;partyMemberId=r.memberId;code=partyCode;show('lobby');await refreshParty()}catch(e){toast(e.message)}}
+async function joinParty(){try{partyCode=$('joinCode').value.trim().toUpperCase();const name=$('joinName').value.trim()||'Player';const r=await api('/api/parties/'+partyCode+'/join',{method:'POST',body:JSON.stringify({name})});partyMemberId=r.memberId;code=partyCode;show('lobby');await refreshParty()}catch(e){toast(e.message)}}
+async function refreshParty(){try{const r=await api('/api/parties/'+partyCode);$('roomPill').textContent='PARTY '+partyCode;$('code').textContent=partyCode;$('lobbyPlayers').innerHTML=r.party.members.map(m=>'<span class="player">'+esc(m.name)+'</span>').join('')}catch(e){toast(e.message)}}
+async function launchParty(){try{const r=await api('/api/parties/'+partyCode+'/launch',{method:'POST',body:JSON.stringify({memberId:partyMemberId})});code=r.code;playerId=partyMemberId;state=await api('/api/rooms/'+code);show('game');render()}catch(e){toast(e.message)}}
 async function createRoom(){try{const name=$('createName').value.trim()||'Forkmaster';const r=await api('/api/rooms',{method:'POST',body:'{}'});code=r.code;playerId=(await api('/api/rooms/'+code+'/join',{method:'POST',body:JSON.stringify({name})})).id;await refresh();show('lobby')}catch(e){toast(e.message)}}
 async function joinRoom(){try{code=$('joinCode').value.trim().toUpperCase();const name=$('joinName').value.trim()||'Player';const r=await api('/api/rooms/'+code+'/join',{method:'POST',body:JSON.stringify({name})});playerId=r.id;state=r.state;show(state.started?'game':'lobby');render()}catch(e){toast(e.message)}}
 async function refresh(){if(!code)return;try{state=await api('/api/rooms/'+code);render()}catch(e){toast(e.message)}}
@@ -50,6 +54,6 @@ if(state.started)show('game');else if(code)show('lobby');
 }
 function cardText(t){return ({skip:'End your turn.',double:'Take another turn.',peek:'Inspect the danger.',deflect:'Pass the turn.',steal:'Grab a random card.',lucky:'Draw again safely.'})[t]||''}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-setInterval(()=>{if(code)refresh()},1500);
+setInterval(()=>{if(partyCode&&!state?.started)refreshParty();else if(code)refresh()},1500);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');
 </script></body></html>
