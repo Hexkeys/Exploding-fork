@@ -55,13 +55,12 @@ function publicState(room,viewerId=null,viewerToken=null){
     code:room.code,started:room.started,turn:room.turn,round:room.round,winner:room.winner,
     partyCode:room.partyCode,botThinking:!!room.botThinking,
     viewerId:viewer?.id||null,viewerEliminated:!!room.eliminated?.[viewerId],
-    viewerHand,viewerPeek:(viewerActive&&viewer?.lastPeek)?viewer.lastPeek:null,
+    viewerHand,
     viewerPrivateLog:viewerActive&&viewer?.privateLog?viewer.privateLog.slice(-10):[],
     players:room.players.map(p=>({
       id:p.id,name:p.name,bot:!!p.bot,isLeader:p.id===room.host,
       handCount:p.hand.length,
-      hand:(p.id===viewerId&&p.token===viewerToken)?p.hand.map(c=>({id:c.id,name:c.name,label:c.label,type:c.type})):[],
-      peek:(p.id===viewerId&&p.token===viewerToken&&p.lastPeek)?p.lastPeek:null
+      hand:(p.id===viewerId&&p.token===viewerToken)?p.hand.map(c=>({id:c.id,name:c.name,label:c.label,type:c.type})):[]
     })),
     log:room.log.slice(-30),deckCount:room.deck.length
   };
