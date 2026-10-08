@@ -236,7 +236,7 @@ app.get('/api/rooms/:code',(req,res)=>{const room=rooms.get(cleanCode(req.params
 app.post('/api/rooms/:code/start',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));if(!room)return res.status(404).json({error:'Room not found.'});
   if(room.players.length<2)return res.status(400).json({error:'You need at least 2 players.'});if(room.started)return res.json(publicState(room));
-  startGame(room);res.json(publicState(room));
+  startGame(room);res.json(publicState(room,String(req.body?.playerId||'')));
 });
 app.post('/api/rooms/:code/draw',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));
