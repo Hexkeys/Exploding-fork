@@ -148,8 +148,9 @@ function render(){
   $('deckCountBig').textContent=state.deckCount;
   const me=state.players.find(p=>p.id===playerId);
   const current=state.players[state.turn];
-  $('turnText').textContent=state.winner?'🏆 '+state.winner+' wins!':current?(current.id===playerId?'⚡ YOUR TURN':'Waiting for '+current.name):'Game over';
+  $('turnText').textContent=state.winner?'🏆 '+state.winner+' wins!':(state.botThinking&&current?.bot)?'🤖 BOT IS THINKING':current?(current.id===playerId?'⚡ YOUR TURN':'Waiting for '+current.name):'Game over';
   $('drawBtn').disabled=!!state.winner||!current||current.id!==playerId;
+  $('deckVisual').disabled=$('drawBtn').disabled||!!state.botThinking;
 
   $('tableSeats').innerHTML=state.players.map((p,i)=>{
     const cls=seatClass(i,state.players.length)+(i===state.turn?' current':'')+(p.id===playerId?' me':'');
