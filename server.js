@@ -34,7 +34,7 @@ function deckFor(count){
   return base.slice(0,Math.max(0,count)).map(c=>({...c}));
 }
 function publicParty(p){
-  return {code:p.code,name:p.name,hostId:p.hostId,members:p.members.map(m=>({id:m.id,name:m.name,ready:m.ready})),max:12};
+  return {code:p.code,name:p.name,hostId:p.hostId,members:p.members.map(m=>({id:m.id,name:m.name,ready:m.ready})),max:6};
 }
 function publicState(room){
   return {
@@ -89,6 +89,7 @@ app.post('/api/parties',(req,res)=>{
 app.post('/api/parties/:code/join',(req,res)=>{
   const code=cleanCode(req.params.code),party=parties.get(code);
   if(!party)return res.status(404).json({error:'Party not found.'});
+  if(party.roomCode)return res.status(409).json({error:'That party has already started.'});
   if(party.members.length>=party.max)return res.status(409).json({error:'Party is full.'});
   const id=crypto.randomUUID(),name=cleanName(req.body?.name||'Player');
   party.members.push({id,name,ready:true});
@@ -120,6 +121,42 @@ app.post('/api/bot-games',(req,res)=>{
   res.status(201).json({code,id,state:publicState(room)});
 });
 
+function reinsertBomb(room,bomb){
+  const at=Math.floor(Math.random()*(room.deck.length+1));
+  room.deck.splice(at,0,{...bomb,id:crypto.randomUUID()});
+}
+function eliminatePlayer(room,playerIndex,playerName){
+  room.players.splice(playerIndex,1);
+  if(room.players.length===1){
+    room.winner=room.players[0].name;
+    room.started=false;
+    addLog(room,room.winner+' wins the fork!');
+  }else if(room.players.length===0){
+    room.started=false;
+  }else if(room.turn>=room.players.length){
+    room.turn=0;
+  }
+}
+function drawAndResolve(room,p,source){
+  if(!room.deck.length)refill(room);
+  if(!room.deck.length)return {card:null};
+  const card=room.deck.pop();
+  p.hand.push(card);
+  if(card.type!=='bomb')return {card,eliminated:false};
+  const defuseIndex=p.hand.findIndex(x=>x.type==='shield');
+  if(defuseIndex>=0){
+    p.hand.splice(defuseIndex,1);
+    p.hand.pop();
+    reinsertBomb(room,card);
+    addLog(room,p.name+' found a Fork Bomb and used a Defuse.');
+    return {card,bomb:true,defused:true,eliminated:false};
+  }
+  p.hand.pop();
+  addLog(room,p.name+' hit a Fork Bomb and is out.');
+  const playerIndex=room.players.findIndex(x=>x.id===p.id);
+  if(playerIndex>=0)eliminatePlayer(room,playerIndex,p.name);
+  return {card,bomb:true,defused:false,eliminated:true};
+}
 function runBotTurn(room){
   const bot=room.players[room.turn];
   if(!bot?.bot||!room.started||room.botThinking)return false;
@@ -151,41 +188,19 @@ function runBotTurn(room){
         }else addLog(room,'Quantum Bot tried to steal, but your hand was empty.');
         nextTurn(room,1);
       }else if(c.type==='lucky'){
-        draw(room,bot);
-        addLog(room,'Quantum Bot used Lucky Fork.');
-        nextTurn(room,1);
+        const result=drawAndResolve(room,bot,'bot');
+        if(!result.eliminated)nextTurn(room,1);
       }else{
         addLog(room,'Quantum Bot played Safe Bite.');
         nextTurn(room,1);
       }
     }else{
-      draw(room,bot);
-      const c=bot.hand.at(-1);
-      if(!c){
+      const result=drawAndResolve(room,bot,'bot');
+      if(!result.card){
+        addLog(room,'Quantum Bot could not draw.');
         nextTurn(room,1);
-      }else if(c.type==='bomb'){
-        const shield=bot.hand.findIndex(x=>x.type==='shield');
-        if(shield>=0){
-          bot.hand.splice(shield,1);
-          bot.hand.pop();
-          room.discard.push(c);
-          const at=Math.floor(Math.random()*(room.deck.length+1));
-          room.deck.splice(at,0,{...c,id:crypto.randomUUID()});
-          addLog(room,'Quantum Bot blocked a Fork Bomb with Shield.');
-          nextTurn(room,1);
-        }else{
-          bot.hand.pop();
-          room.discard.push(c);
-          addLog(room,'Quantum Bot hit a Fork Bomb and is out.');
-          room.players.splice(room.turn,1);
-          if(room.players.length===1){
-            room.winner=room.players[0].name;
-            room.started=false;
-            addLog(room,room.winner+' wins the fork!');
-          }else if(room.turn>=room.players.length){
-            room.turn=0;
-          }
-        }
+      }else if(result.eliminated){
+        // Turn index already points to the next player after elimination.
       }else{
         addLog(room,'Quantum Bot drew a card.');
         nextTurn(room,1);
@@ -224,17 +239,17 @@ app.post('/api/rooms/:code/start',(req,res)=>{
   startGame(room);res.json(publicState(room));
 });
 app.post('/api/rooms/:code/draw',(req,res)=>{
-  const room=rooms.get(cleanCode(req.params.code));if(!room||!room.started)return res.status(400).json({error:'Game is not active.'});
-  const p=room.players.find(x=>x.id===req.body?.playerId);if(!p)return res.status(404).json({error:'Player not found.'});
+  const room=rooms.get(cleanCode(req.params.code));
+  if(!room||!room.started)return res.status(400).json({error:'Game is not active.'});
+  const p=room.players.find(x=>x.id===req.body?.playerId);
+  if(!p)return res.status(404).json({error:'Player not found.'});
   if(room.players[room.turn]?.id!==p.id)return res.status(400).json({error:'Wait for your turn.'});
-  draw(room,p);const c=p.hand[p.hand.length-1];if(!c)return res.status(400).json({error:'No cards left.'});
-  if(c.type==='bomb'){
-    const shield=p.hand.findIndex(x=>x.type==='shield');
-    if(shield>=0){p.hand.splice(shield,1);p.hand.pop();room.discard.push(c);addLog(room,p.name+' found a Fork Bomb and used a Shield.');const at=Math.floor(Math.random()*(room.deck.length+1));room.deck.splice(at,0,{...c,id:crypto.randomUUID()});}
-    else{p.hand.pop();room.discard.push(c);addLog(room,p.name+' hit the Fork Bomb and is out.');room.players.splice(room.turn,1);if(room.players.length===1){room.winner=room.players[0].name;room.started=false;addLog(room,room.winner+' wins the fork!');}else if(room.turn>=room.players.length)room.turn=0;res.json(publicState(room));return;}
-  }else{addLog(room,p.name+' drew '+c.name+'.');}
-  nextTurn(room,1);res.json(publicState(room));
+  const result=drawAndResolve(room,p,'player');
+  if(!result.card)return res.status(400).json({error:'No cards left.'});
+  if(!result.eliminated)nextTurn(room,1);
+  res.json(publicState(room));
 });
+
 app.post('/api/rooms/:code/play',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));if(!room||!room.started)return res.status(400).json({error:'Game is not active.'});
   const p=room.players.find(x=>x.id===req.body?.playerId);if(!p||room.players[room.turn]?.id!==p.id)return res.status(400).json({error:'Not your turn.'});
