@@ -34,7 +34,7 @@ function deckFor(count){
   return base.slice(0,Math.max(0,count)).map(c=>({...c}));
 }
 function publicParty(p){
-  return {code:p.code,name:p.name,hostId:p.hostId,members:p.members.map(m=>({id:m.id,name:m.name,ready:m.ready})),max:6};
+  return {code:p.code,name:p.name,hostId:p.hostId,members:p.members.map(m=>({id:m.id,name:m.name,ready:m.ready,isLeader:m.id===p.hostId})),max:6};
 }
 function publicState(room,viewerId=null){
   return {
@@ -247,7 +247,7 @@ app.post('/api/rooms/:code/draw',(req,res)=>{
   const result=drawAndResolve(room,p,'player');
   if(!result.card)return res.status(400).json({error:'No cards left.'});
   if(!result.eliminated)nextTurn(room,1);
-  res.json(publicState(room));
+  res.json(publicState(room,p.id));
 });
 
 app.post('/api/rooms/:code/play',(req,res)=>{
