@@ -162,8 +162,6 @@ function startGame(room){
   const openingSafe=Array.from({length:playerCount*7},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
   for(let i=0;i<playerCount;i++){
     room.players[i].hand=[cardFromTuple(['Defuse','SAVE','defuse']),...openingSafe.slice(i*7,i*7+7)];
-    room.players[i].lastPeek=null;
-    room.players[i].privateLog=[];
   }
   const deck=Array.from({length:Math.max(20,playerCount*6)},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
   for(let i=0;i<Math.max(1,playerCount-1);i++)deck.push(cardFromTuple(['Fork Bomb','BOOM','bomb']));
@@ -239,13 +237,6 @@ function runBotTurn(room){
       if(c.type==='skip'){addLog(room,'Quantum Bot played Skip.');advanceTurn(room,1);}
       else if(c.type==='double'){addLog(room,'Quantum Bot played Double Turn.');room.round++;room.updatedAt=Date.now();}
       else if(c.type==='deflect'){addLog(room,'Quantum Bot played Deflect.');advanceTurn(room,2);}
-      else if(c.type==='peek'){
-        const top=room.deck.at(-1);
-        bot.lastPeek=top?{name:top.name,label:top.label,type:top.type}:null;
-        bot.privateLog=bot.privateLog||[];
-        bot.privateLog.push(top?'PEEK // '+top.name+' ['+top.label+']':'PEEK // EMPTY DECK');
-        addLog(room,'Quantum Bot checked the deck.');
-        advanceTurn(room,1);
       }else if(c.type==='steal'){
         if(target?.hand.length){
           const i=Math.floor(Math.random()*target.hand.length);
