@@ -42,7 +42,7 @@ function safeCardPool(){
 }
 function publicParty(p){
   return {
-    code:p.code,name:p.name,hostId:p.hostId,max:p.max,
+    code:p.code,name:p.name,hostId:p.hostId,max:p.max,roomCode:p.roomCode,
     members:p.members.map(m=>({id:m.id,name:m.name,ready:m.ready,isLeader:m.id===p.hostId}))
   };
 }
@@ -302,7 +302,7 @@ app.get('/api/rooms/:code',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));
   if(!room)return res.status(404).json({error:'Room not found.'});
   const viewer=authorizeViewer(room,req);
-  if(room.started&&!viewer)return res.status(403).json({error:'Player authorization failed.'});
+  if(room.started&&!viewer)return res.status(401).json({error:'Session expired. Rejoin the game.'});
   res.json(publicState(room,viewer?.player?.id,viewer?.player?.token));
 });
 app.post('/api/rooms/:code/start',(req,res)=>{
