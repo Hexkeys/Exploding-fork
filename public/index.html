@@ -62,7 +62,7 @@ async function refreshParty(){
     $('lobbyPlayers').innerHTML=r.party.members.map(m=>'<span class="player">'+esc(m.name)+'</span>').join('');
     if(r.party.roomCode){
       code=r.party.roomCode;
-      state=await api('/api/rooms/'+code);
+      state=await api('/api/rooms/'+code+'?playerId='+encodeURIComponent(playerId));
       if(state.started)show('game');
       render();
     }
@@ -76,7 +76,7 @@ async function launchParty(){
     const r=await api('/api/parties/'+partyCode+'/launch',{method:'POST',body:JSON.stringify({memberId:partyMemberId})});
     code=r.code;
     playerId=partyMemberId;
-    state=r.state||await api('/api/rooms/'+code);
+    state=r.state||await api('/api/rooms/'+code+'?playerId='+encodeURIComponent(playerId));
     show('game');
     render();
   }catch(e){toast(e.message)}
@@ -110,7 +110,7 @@ async function refresh(){
   if(!code||pollBusy||actionBusy)return;
   pollBusy=true;
   try{
-    state=await api('/api/rooms/'+code);
+    state=await api('/api/rooms/'+code+'?playerId='+encodeURIComponent(playerId));
     render();
   }catch(e){toast(e.message)}
   finally{pollBusy=false}
@@ -154,7 +154,7 @@ function render(){
 
   $('tableSeats').innerHTML=state.players.map((p,i)=>{
     const cls=seatClass(i,state.players.length)+(i===state.turn?' current':'')+(p.id===playerId?' me':'');
-    return '<div class="'+cls+'"><div class="seat-name">'+esc(p.name)+(p.bot?' · BOT':'')+'</div><div class="seat-meta">'+p.hand.length+' cards</div>'+
+    return '<div class="'+cls+'"><div class="seat-name">'+esc(p.name)+(p.bot?' · BOT':'')+'</div><div class="seat-meta">'+(p.handCount??p.hand.length)+' cards</div>'+
       (i===state.turn?'<div class="seat-turn">● CURRENT TURN</div>':'')+
       (p.id===playerId?'<div class="seat-turn">YOU</div>':'')+
       '</div>';
@@ -182,12 +182,12 @@ async function pollGame(){
   if(actionBusy||pollBusy)return;
   if(state?.started&&state.players[state.turn]?.bot){
     actionBusy=true;
-    try{state=await api('/api/rooms/'+code+'/bot-turn',{method:'POST',body:'{}'});render()}
+    try{state=await api('/api/rooms/'+code+'/bot-turn',{method:'POST',body:JSON.stringify({playerId})});render()}
     catch(e){toast(e.message)}
     finally{actionBusy=false}
   }
 }
 setInterval(pollGame,1500);
 pollGame();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=4');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=5');
 </script></body></html>
