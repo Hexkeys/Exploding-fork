@@ -125,8 +125,14 @@ async function refreshParty(){
     renderParty(r.party);
     if(r.party.roomCode){
       roomCode=r.party.roomCode;saveSession();
-      state=await api('/api/rooms/'+roomCode+'?playerId='+encodeURIComponent(playerId));
-      show('game');render();
+      try{
+        state=await api('/api/rooms/'+roomCode+'?playerId='+encodeURIComponent(playerId));
+        show('game');render();
+      }catch(e){
+        if(/session expired|player authorization failed|room not found/i.test(String(e?.message||''))){
+          clearSession();roomCode='';partyCode='';partyMemberId='';partyLeader=false;state=null;show('home');
+        }else toast(e.message);
+      }
     }
   }catch(e){
     if(/not found|already started|authorization/i.test(e.message)){clearSession();roomCode='';partyCode='';state=null;show('home');}
@@ -171,7 +177,13 @@ async function refresh(){
     state=await api('/api/rooms/'+roomCode+'?playerId='+encodeURIComponent(playerId));
     render();
   }catch(e){
-    clearSession();roomCode='';playerId='';playerToken='';state=null;show('home');toast(e.message);
+    const msg=String(e?.message||'Request failed');
+    if(/session expired|player authorization failed|room not found/i.test(msg)){
+      clearSession();roomCode='';playerId='';playerToken='';partyCode='';partyMemberId='';partyLeader=false;state=null;show('home');
+    }else{
+      toast(msg);
+      if(state)render();
+    }
   }finally{pollBusy=false}
 }
 async function startGame(){
@@ -243,8 +255,8 @@ async function pollGame(){
   if(partyCode&&!roomCode){await refreshParty();return;}
   if(!roomCode)return;
   await refresh();
-  if(actionBusy||pollBusy)return;
-  if(state?.started&&state.players[state.turn]?.bot){
+  if(actionBusy||pollBusy||!state?.started)return;
+  if(state.players[state.turn]?.bot){
     actionBusy=true;
     state.botThinking=true;render();
     try{
