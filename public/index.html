@@ -184,13 +184,13 @@ async function startGame(){
 }
 async function drawCard(){
   if(actionBusy||!playerId||!roomCode)return;actionBusy=true;
-  try{state=await api('/api/rooms/'+roomCode+'/draw',{method:'POST',body:JSON.stringify({playerId}));render()}
+  try{state=await api('/api/rooms/'+roomCode+'/draw',{method:'POST',body:JSON.stringify({playerId})});render()}
   catch(e){toast(e.message)}
   finally{actionBusy=false}
 }
 async function playCard(id){
   if(actionBusy||!playerId||!roomCode)return;actionBusy=true;
-  try{state=await api('/api/rooms/'+roomCode+'/play',{method:'POST',body:JSON.stringify({playerId,cardId:id}));render()}
+  try{state=await api('/api/rooms/'+roomCode+'/play',{method:'POST',body:JSON.stringify({playerId,cardId:id})});render()}
   catch(e){toast(e.message)}
   finally{actionBusy=false}
 }
