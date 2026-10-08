@@ -36,11 +36,11 @@ function deckFor(count){
 function publicParty(p){
   return {code:p.code,name:p.name,hostId:p.hostId,members:p.members.map(m=>({id:m.id,name:m.name,ready:m.ready})),max:6};
 }
-function publicState(room){
+function publicState(room,viewerId=null){
   return {
     code:room.code,started:room.started,turn:room.turn,round:room.round,winner:room.winner,
     partyCode:room.partyCode,
-    players:room.players.map(p=>({id:p.id,name:p.name,bot:!!p.bot,hand:p.hand.map(c=>({id:c.id,name:c.name,label:c.label,type:c.type}))})),
+    players:room.players.map(p=>({id:p.id,name:p.name,bot:!!p.bot,handCount:p.hand.length,hand:p.id===viewerId?p.hand.map(c=>({id:c.id,name:c.name,label:c.label,type:c.type})):[]})),
     log:room.log.slice(-30),deckCount:room.deck.length,
     top:room.deck.length?{name:'Mystery Fork',label:'?',type:'mystery'}:null,
     botThinking:!!room.botThinking
@@ -107,7 +107,7 @@ app.post('/api/parties/:code/launch',(req,res)=>{
   if(party.roomCode){return res.json({code:party.roomCode});}
   let code=makeCode(),host=party.hostId;
   const room={code,partyCode:party.code,host,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,name:m.name,hand:[]})),deck:[],discard:[],log:[]};
-  rooms.set(code,room);startGame(room);party.roomCode=code;res.json({code,started:true,state:publicState(room)});
+  rooms.set(code,room);startGame(room);party.roomCode=code;res.json({code,started:true,state:publicState(room,memberId)});
 });
 
 app.post('/api/bot-games',(req,res)=>{
@@ -118,7 +118,7 @@ app.post('/api/bot-games',(req,res)=>{
     {id:botId,name:'Quantum Bot',hand:[],bot:true}
   ],deck:[],discard:[],log:[]};
   rooms.set(code,room);startGame(room);addLog(room,'Quantum Bot is connected.');
-  res.status(201).json({code,id,state:publicState(room)});
+  res.status(201).json({code,id,state:publicState(room,id)});
 });
 
 function reinsertBomb(room,bomb){
@@ -230,9 +230,9 @@ app.post('/api/rooms/:code/join',(req,res)=>{
   if(room.started)return res.status(409).json({error:'That game already started.'});
   if(room.players.length>=6)return res.status(409).json({error:'Room is full.'});
   const name=cleanName(req.body?.name||'Player'),id=crypto.randomUUID();room.players.push({id,name,hand:[]});addLog(room,name+' joined the table.');
-  res.json({id,state:publicState(room)});
+  res.json({id,state:publicState(room,id)});
 });
-app.get('/api/rooms/:code',(req,res)=>{const room=rooms.get(cleanCode(req.params.code));if(!room)return res.status(404).json({error:'Room not found.'});res.json(publicState(room));});
+app.get('/api/rooms/:code',(req,res)=>{const room=rooms.get(cleanCode(req.params.code));if(!room)return res.status(404).json({error:'Room not found.'});res.json(publicState(room,String(req.query?.playerId||'')));});
 app.post('/api/rooms/:code/start',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));if(!room)return res.status(404).json({error:'Room not found.'});
   if(room.players.length<2)return res.status(400).json({error:'You need at least 2 players.'});if(room.started)return res.json(publicState(room));
@@ -291,7 +291,7 @@ app.post('/api/rooms/:code/play',(req,res)=>{
     addLog(room,p.name+' played Safe Bite.');
     nextTurn(room,1);
   }
-  res.json(publicState(room));
+  res.json(publicState(room,p.id));
 });
 app.use((_req,res)=>res.sendFile(process.cwd()+'/public/index.html'));
 app.listen(port,()=>console.log('Exploding Fork listening on '+port));
