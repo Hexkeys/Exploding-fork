@@ -57,6 +57,7 @@ function publicState(room,viewerId=null,viewerToken=null){
     partyCode:room.partyCode,botThinking:!!room.botThinking,
     viewerId:viewer?.id||null,viewerEliminated:!!room.eliminated?.[viewerId],
     viewerHand,viewerPeek:(viewerActive&&viewer?.lastPeek)?viewer.lastPeek:null,
+    viewerPrivateLog:viewerActive&&viewer?.privateLog?viewer.privateLog.slice(-10):[],
     players:room.players.map(p=>({
       id:p.id,name:p.name,bot:!!p.bot,isLeader:p.id===room.host,
       handCount:p.hand.length,
@@ -94,7 +95,7 @@ function eliminatePlayer(room,index){
   const p=room.players[index];
   if(!p)return;
   room.eliminated=room.eliminated||{};
-  room.eliminated[p.id]={id:p.id,token:p.token,name:p.name,bot:!!p.bot,hand:[],lastPeek:null};
+  room.eliminated[p.id]={id:p.id,token:p.token,name:p.name,bot:!!p.bot,hand:[],lastPeek:null,privateLog:[...(p.privateLog||[])]};
   room.players.splice(index,1);
   if(room.players.length===1){
     room.winner=room.players[0].name;
@@ -138,7 +139,7 @@ function safeDraw(room,p){
   return card;
 }
 function createPlayer(name,bot=false){
-  return {id:newId(),token:newToken(),name:cleanName(name),bot,hand:[],lastPeek:null};
+  return {id:newId(),token:newToken(),name:cleanName(name),bot,hand:[],lastPeek:null,privateLog:[]};
 }
 function authorizePlayer(room,req,playerIdField='playerId'){
   const playerId=String(req.body?.[playerIdField]||req.query?.playerId||'');
@@ -165,6 +166,7 @@ function startGame(room){
   for(let i=0;i<playerCount;i++){
     room.players[i].hand=[cardFromTuple(['Defuse','SAVE','defuse']),...openingSafe.slice(i*7,i*7+7)];
     room.players[i].lastPeek=null;
+    room.players[i].privateLog=[];
   }
   const deck=Array.from({length:Math.max(20,playerCount*6)},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
   for(let i=0;i<Math.max(1,playerCount-1);i++)deck.push(cardFromTuple(['Fork Bomb','BOOM','bomb']));
@@ -207,7 +209,7 @@ app.post('/api/parties/:code/launch',(req,res)=>{
     party.roomCode=null;
   }
   const roomCode=makeCode();
-  const room={code:roomCode,partyCode:party.code,host:party.hostId,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,token:m.token,name:m.name,bot:false,hand:[],lastPeek:null})),deck:[],discard:[],eliminated:{},log:[],updatedAt:Date.now(),botThinking:false};
+  const room={code:roomCode,partyCode:party.code,host:party.hostId,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,token:m.token,name:m.name,bot:false,hand:[],lastPeek:null,privateLog:[]})),deck:[],discard:[],eliminated:{},log:[],updatedAt:Date.now(),botThinking:false};
   rooms.set(roomCode,room);
   startGame(room);
   party.roomCode=roomCode;
@@ -243,6 +245,8 @@ function runBotTurn(room){
       else if(c.type==='peek'){
         const top=room.deck.at(-1);
         bot.lastPeek=top?{name:top.name,label:top.label,type:top.type}:null;
+        bot.privateLog=bot.privateLog||[];
+        bot.privateLog.push(top?'PEEK // '+top.name+' ['+top.label+']':'PEEK // EMPTY DECK');
         addLog(room,'Quantum Bot checked the deck.');
         advanceTurn(room,1);
       }else if(c.type==='steal'){
@@ -345,6 +349,8 @@ app.post('/api/rooms/:code/play',(req,res)=>{
   }else if(c.type==='peek'){
     const top=room.deck.at(-1);
     player.lastPeek=top?{name:top.name,label:top.label,type:top.type}:null;
+    player.privateLog=player.privateLog||[];
+    player.privateLog.push(top?'PEEK // '+top.name+' ['+top.label+']':'PEEK // EMPTY DECK');
     addLog(room,player.name+' scanned the mystery fork.');
     advanceTurn(room,1);
   }else if(c.type==='deflect'){
