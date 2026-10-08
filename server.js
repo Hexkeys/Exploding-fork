@@ -349,7 +349,8 @@ app.post('/api/rooms/:code/play',(req,res)=>{
     advanceTurn(room,1);
   }else if(c.type==='double'){
     addLog(room,player.name+' played Double Turn. Your turn continues until you draw.');touch(room); }else if(c.type==='deflect'){
-    addLog(room,player.name+' played Deflect. Your turn continues until you draw.');
+    addLog(room,player.name+' played Deflect. It skipped the next player.');
+    advanceTurn(room,2);
   }else if(c.type==='steal'){
     const target=room.players[(room.turn+1)%room.players.length];
     if(target?.hand.length){
