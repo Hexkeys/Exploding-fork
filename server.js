@@ -243,11 +243,11 @@ app.post('/api/rooms/:code/play',(req,res)=>{
   room.discard.push(c);
   if(c.type==='skip'){addLog(room,p.name+' played Skip.');nextTurn(room,1)}
   else if(c.type==='double'){addLog(room,p.name+' played Double Turn.');nextTurn(room,2)}
-  else if(c.type==='peek'){addLog(room,p.name+' scanned the mystery fork.')}
+  else if(c.type==='peek'){addLog(room,p.name+' scanned the mystery fork.');nextTurn(room,1)}
   else if(c.type==='deflect'){addLog(room,p.name+' deflected the danger.');nextTurn(room,2)}
   else if(c.type==='steal'){const target=room.players[(room.turn+1)%room.players.length];if(target?.hand.length){const i=Math.floor(Math.random()*target.hand.length);p.hand.push(target.hand.splice(i,1)[0]);addLog(room,p.name+' grabbed a card from '+target.name+'.')}else addLog(room,p.name+' tried to grab a card, but found nothing.')}
   else if(c.type==='lucky'){draw(room,p);addLog(room,p.name+' took a Lucky Fork draw.');nextTurn(room,1)}
-  else if(c.type==='safe')addLog(room,p.name+' played Safe Bite.');
+  else if(c.type==='safe'){addLog(room,p.name+' played Safe Bite.');nextTurn(room,1)}
   res.json(publicState(room));
 });
 app.use((_req,res)=>res.sendFile(process.cwd()+'/public/index.html'));
