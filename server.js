@@ -83,7 +83,7 @@ app.post('/api/parties',(req,res)=>{
   const name=cleanName(req.body?.name||'Fork Party');
   const hostName=cleanName(req.body?.hostName||'Host');
   const code=makeCode(),hostId=crypto.randomUUID();
-  const party={code,name,hostId,members:[{id:hostId,name:hostName,ready:true}],createdAt:Date.now(),roomCode:null};
+  const party={code,name,hostId,members:[{id:hostId,name:hostName,ready:true}],max:6,createdAt:Date.now(),roomCode:null};
   parties.set(code,party);res.status(201).json({party:publicParty(party),memberId:hostId});
 });
 app.post('/api/parties/:code/join',(req,res)=>{
