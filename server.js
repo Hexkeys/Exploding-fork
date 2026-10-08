@@ -65,7 +65,7 @@ function publicState(room,viewerId=null,viewerToken=null){
     log:room.log.slice(-30),deckCount:room.deck.length
   };
 }
-function addLog(room,text){room.log.push({id:newId(),text,at:Date.now()});room.updatedAt=Date.now();}
+function addLog(room,text,type='info'){room.log.push({id:newId(),text,at:Date.now(),type});room.updatedAt=Date.now();}
 function touch(room){room.updatedAt=Date.now();}
 function advanceTurn(room,steps=1){
   if(!room.players.length)return;
@@ -118,11 +118,11 @@ function drawAndResolve(room,p){
     p.hand.splice(defuseIndex,1);
     p.hand.pop();
     reinsertBomb(room,card);
-    addLog(room,p.name+' found a Fork Bomb and used a Defuse.');
+    addLog(room,p.name+' found a Fork Bomb and used a Defuse.','bomb-defused');
     return {card,eliminated:false,defused:true};
   }
   p.hand.pop();
-  addLog(room,p.name+' hit a Fork Bomb and is out.');
+  addLog(room,p.name+' hit a Fork Bomb and is out.','bomb-hit');
   const index=room.players.findIndex(x=>x.id===p.id);
   if(index>=0)eliminatePlayer(room,index);
   return {card,eliminated:true,defused:false};
@@ -163,8 +163,15 @@ function startGame(room){
   for(let i=0;i<playerCount;i++){
     room.players[i].hand=[cardFromTuple(['Defuse','SAVE','defuse']),...openingSafe.slice(i*7,i*7+7)];
   }
-  const deck=Array.from({length:Math.max(20,playerCount*6)},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
-  for(let i=0;i<Math.max(1,playerCount-1);i++)deck.push(cardFromTuple(['Fork Bomb','BOOM','bomb']));
+  const deckConfig={
+    2:{size:50,bombs:1},
+    3:{size:100,bombs:2},
+    4:{size:150,bombs:4},
+    5:{size:200,bombs:6},
+    6:{size:250,bombs:8}
+  }[playerCount]||{size:50,bombs:1};
+  const deck=Array.from({length:deckConfig.size-deckConfig.bombs},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
+  for(let i=0;i<deckConfig.bombs;i++)deck.push(cardFromTuple(['Fork Bomb','BOOM','bomb']));
   room.deck=shuffle(deck);
   addLog(room,'Game started. Each player starts with 1 Defuse and 7 random cards.');
 }
@@ -235,12 +242,14 @@ function runBotTurn(room){
       bot.hand=bot.hand.filter(x=>x.id!==c.id);
       room.discard.push({...c,id:newId()});
       if(c.type==='skip'){
-        addLog(room,'Quantum Bot played Skip. Its turn continues until it draws.');
+        addLog(room,'Quantum Bot played Skip. Turn passed to the next player.');
+        advanceTurn(room,1);
       }else if(c.type==='double'){
         addLog(room,'Quantum Bot played Double Turn. Its turn continues until it draws.');
         touch(room);
       }else if(c.type==='deflect'){
-        addLog(room,'Quantum Bot played Deflect. Its turn continues until it draws.');
+        addLog(room,'Quantum Bot played Deflect. It skipped the next player.');
+        advanceTurn(room,2);
       }else if(c.type==='steal'){
         if(target?.hand.length){
           const i=Math.floor(Math.random()*target.hand.length);
@@ -336,7 +345,8 @@ app.post('/api/rooms/:code/play',(req,res)=>{
   if(c.type==='defuse'||c.type==='bomb')return res.status(400).json({error:'That card is reactive or drawn automatically.'});
   room.discard.push({...c,id:newId()});
   if(c.type==='skip'){
-    addLog(room,player.name+' played Skip. Your turn continues until you draw.');
+    addLog(room,player.name+' played Skip. Turn passed to the next player.');
+    advanceTurn(room,1);
   }else if(c.type==='double'){
     addLog(room,player.name+' played Double Turn. Your turn continues until you draw.');touch(room); }else if(c.type==='deflect'){
     addLog(room,player.name+' played Deflect. Your turn continues until you draw.');
