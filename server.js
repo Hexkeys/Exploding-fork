@@ -234,9 +234,16 @@ function runBotTurn(room){
       const c=playable[Math.floor(Math.random()*playable.length)];
       bot.hand=bot.hand.filter(x=>x.id!==c.id);
       room.discard.push({...c,id:newId()});
-      if(c.type==='skip'){addLog(room,'Quantum Bot played Skip.');advanceTurn(room,1);}
-      else if(c.type==='double'){addLog(room,'Quantum Bot played Double Turn.');room.round++;room.updatedAt=Date.now();}
-      else if(c.type==='deflect'){addLog(room,'Quantum Bot played Deflect.');advanceTurn(room,2);}
+      if(c.type==='skip'){
+        addLog(room,'Quantum Bot played Skip.');
+        advanceTurn(room,1);
+      }else if(c.type==='double'){
+        addLog(room,'Quantum Bot played Double Turn.');
+        room.round++;
+        room.updatedAt=Date.now();
+      }else if(c.type==='deflect'){
+        addLog(room,'Quantum Bot played Deflect.');
+        advanceTurn(room,2);
       }else if(c.type==='steal'){
         if(target?.hand.length){
           const i=Math.floor(Math.random()*target.hand.length);
@@ -254,8 +261,13 @@ function runBotTurn(room){
       }
     }else{
       const result=drawAndResolve(room,bot);
-      if(!result.card){addLog(room,'Quantum Bot could not draw.');advanceTurn(room,1);}
-      else if(!result.eliminated){addLog(room,'Quantum Bot drew a card.');advanceTurn(room,1);}
+      if(!result.card){
+        addLog(room,'Quantum Bot could not draw.');
+        advanceTurn(room,1);
+      }else if(!result.eliminated){
+        addLog(room,'Quantum Bot drew a card.');
+        advanceTurn(room,1);
+      }
     }
   }finally{
     room.botThinking=false;
@@ -263,7 +275,6 @@ function runBotTurn(room){
   }
   return true;
 }
-
 app.post('/api/rooms/:code/bot-turn',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));
   if(!room||!room.started)return res.status(400).json({error:'Game is not active.'});
