@@ -59,7 +59,7 @@ async function refreshParty(){
     const r=await api('/api/parties/'+partyCode);
     $('roomPill').textContent='PARTY '+partyCode;
     $('code').textContent=partyCode;
-    $('lobbyPlayers').innerHTML=r.party.members.map(m=>'<span class="player">'+esc(m.name)+'</span>').join('');
+    $('lobbyPlayers').innerHTML=r.party.members.map(m=>'<span class="player">'+esc(m.name)+(m.isLeader?' · PARTY LEADER':'')+'</span>').join('');
     if(r.party.roomCode){
       code=r.party.roomCode;
       state=await api('/api/rooms/'+code+'?playerId='+encodeURIComponent(playerId));
@@ -142,7 +142,7 @@ function render(){
   if(!state)return;
   $('roomPill').textContent=code?'TABLE '+code:'NO TABLE';
   $('code').textContent=code;
-  $('lobbyPlayers').innerHTML=state.players.map(p=>'<span class="player">'+esc(p.name)+'</span>').join('');
+  $('lobbyPlayers').innerHTML=state.players.map(p=>'<span class="player">'+esc(p.name)+(p.isLeader?' · PARTY LEADER':'')+'</span>').join('');
   $('round').textContent=state.round;
   $('deckText').textContent='Deck: '+state.deckCount;
   $('deckCountBig').textContent=state.deckCount;
@@ -189,5 +189,5 @@ async function pollGame(){
 }
 setInterval(pollGame,1500);
 pollGame();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=5');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=6');
 </script></body></html>
