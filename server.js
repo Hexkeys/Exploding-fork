@@ -11,7 +11,7 @@ const rooms=new Map();
 
 const cards=[
   ['Fork Bomb','BOOM','bomb'],['Fork Bomb','BOOM','bomb'],['Fork Bomb','BOOM','bomb'],
-  ['Shield','BLOCK','shield'],['Shield','BLOCK','shield'],['Shield','BLOCK','shield'],['Shield','BLOCK','shield'],
+  ['Defuse','SAVE','shield'],['Shield','BLOCK','shield'],['Shield','BLOCK','shield'],['Shield','BLOCK','shield'],
   ['Deflect','TURN','deflect'],['Deflect','TURN','deflect'],['Deflect','TURN','deflect'],
   ['Peek','SCAN','peek'],['Peek','SCAN','peek'],['Peek','SCAN','peek'],
   ['Steal','GRAB','steal'],['Steal','GRAB','steal'],['Steal','GRAB','steal'],
@@ -53,11 +53,30 @@ function refill(room){
 }
 function draw(room,p){if(!room.deck.length)refill(room);if(room.deck.length)p.hand.push(room.deck.pop());}
 function startGame(room){
-  room.started=true;room.round=1;room.turn=0;room.winner=null;room.deck=deckFor(Math.max(20,room.players.length*8));room.discard=[];
-  room.players.forEach(p=>p.hand=[]);room.players.forEach(p=>{for(let i=0;i<5;i++)draw(room,p);});
-  room.deck.push(...Array.from({length:Math.max(1,room.players.length-1)},()=>({id:crypto.randomUUID(),name:'Fork Bomb',label:'BOOM',type:'bomb'})));
-  for(let i=room.deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[room.deck[i],room.deck[j]]=[room.deck[j],room.deck[i]];}
-  addLog(room,'Game started. Keep your fork steady.');
+  room.started=true;room.round=1;room.turn=0;room.winner=null;room.discard=[];room.botThinking=false;
+  const playerCount=room.players.length;
+  const safePool=cards.filter(([, ,type])=>type!=='bomb'&&type!=='shield');
+  const openingSafe=[];
+  for(let i=0;i<playerCount*7;i++){
+    const [name,label,type]=safePool[Math.floor(Math.random()*safePool.length)];
+    openingSafe.push({id:crypto.randomUUID(),name,label,type});
+  }
+  const openingDefuses=Array.from({length:playerCount},()=>({id:crypto.randomUUID(),name:'Defuse',label:'SAVE',type:'shield'}));
+  room.players.forEach(p=>p.hand=[]);
+  for(let i=0;i<playerCount;i++){
+    room.players[i].hand.push(openingDefuses[i]);
+    room.players[i].hand.push(...openingSafe.slice(i*7,i*7+7));
+  }
+  const deck=[];
+  const extraSafeCount=Math.max(20,playerCount*6);
+  for(let i=0;i<extraSafeCount;i++){
+    const [name,label,type]=safePool[Math.floor(Math.random()*safePool.length)];
+    deck.push({id:crypto.randomUUID(),name,label,type});
+  }
+  for(let i=0;i<Math.max(1,playerCount-1);i++) deck.push({id:crypto.randomUUID(),name:'Fork Bomb',label:'BOOM',type:'bomb'});
+  for(let i=deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]];}
+  room.deck=deck;
+  addLog(room,'Game started. Each player starts with 1 Defuse and 7 random cards.');
 }
 
 app.post('/api/parties',(req,res)=>{
