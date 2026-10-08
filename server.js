@@ -11,7 +11,7 @@ const rooms=new Map();
 
 const cards=[
   ['Fork Bomb','BOOM','bomb'],['Fork Bomb','BOOM','bomb'],['Fork Bomb','BOOM','bomb'],
-  ['Defuse','SAVE','shield'],['Shield','BLOCK','shield'],['Shield','BLOCK','shield'],['Shield','BLOCK','shield'],
+  ['Defuse','SAVE','defuse'],['Defuse','SAVE','defuse'],['Defuse','SAVE','defuse'],['Defuse','SAVE','defuse'],
   ['Deflect','TURN','deflect'],['Deflect','TURN','deflect'],['Deflect','TURN','deflect'],
   ['Peek','SCAN','peek'],['Peek','SCAN','peek'],['Peek','SCAN','peek'],
   ['Steal','GRAB','steal'],['Steal','GRAB','steal'],['Steal','GRAB','steal'],
@@ -55,13 +55,13 @@ function draw(room,p){if(!room.deck.length)refill(room);if(room.deck.length)p.ha
 function startGame(room){
   room.started=true;room.round=1;room.turn=0;room.winner=null;room.discard=[];room.botThinking=false;
   const playerCount=room.players.length;
-  const safePool=cards.filter(([, ,type])=>type!=='bomb'&&type!=='shield');
+  const safePool=cards.filter(([, ,type])=>type!=='bomb'&&type!=='defuse');
   const openingSafe=[];
   for(let i=0;i<playerCount*7;i++){
     const [name,label,type]=safePool[Math.floor(Math.random()*safePool.length)];
     openingSafe.push({id:crypto.randomUUID(),name,label,type});
   }
-  const openingDefuses=Array.from({length:playerCount},()=>({id:crypto.randomUUID(),name:'Defuse',label:'SAVE',type:'shield'}));
+  const openingDefuses=Array.from({length:playerCount},()=>({id:crypto.randomUUID(),name:'Defuse',label:'SAVE',type:'defuse'}));
   room.players.forEach(p=>p.hand=[]);
   for(let i=0;i<playerCount;i++){
     room.players[i].hand.push(openingDefuses[i]);
@@ -143,7 +143,7 @@ function drawAndResolve(room,p,source){
   const card=room.deck.pop();
   p.hand.push(card);
   if(card.type!=='bomb')return {card,eliminated:false};
-  const defuseIndex=p.hand.findIndex(x=>x.type==='shield');
+  const defuseIndex=p.hand.findIndex(x=>x.type==='defuse');
   if(defuseIndex>=0){
     p.hand.splice(defuseIndex,1);
     p.hand.pop();
@@ -254,15 +254,43 @@ app.post('/api/rooms/:code/play',(req,res)=>{
   const room=rooms.get(cleanCode(req.params.code));if(!room||!room.started)return res.status(400).json({error:'Game is not active.'});
   const p=room.players.find(x=>x.id===req.body?.playerId);if(!p||room.players[room.turn]?.id!==p.id)return res.status(400).json({error:'Not your turn.'});
   const idx=p.hand.findIndex(c=>c.id===req.body?.cardId);if(idx<0)return res.status(404).json({error:'Card not found.'});
-  const c=p.hand.splice(idx,1)[0];if(c.type==='shield'||c.type==='bomb')return res.status(400).json({error:'That card is reactive or drawn automatically.'});
+  const c=p.hand.splice(idx,1)[0];if(c.type==='defuse'||c.type==='bomb')return res.status(400).json({error:'That card is reactive or drawn automatically.'});
   room.discard.push(c);
-  if(c.type==='skip'){addLog(room,p.name+' played Skip.');nextTurn(room,1)}
-  else if(c.type==='double'){addLog(room,p.name+' played Double Turn.');nextTurn(room,2)}
-  else if(c.type==='peek'){addLog(room,p.name+' scanned the mystery fork.');nextTurn(room,1)}
-  else if(c.type==='deflect'){addLog(room,p.name+' deflected the danger.');nextTurn(room,2)}
-  else if(c.type==='steal'){const target=room.players[(room.turn+1)%room.players.length];if(target?.hand.length){const i=Math.floor(Math.random()*target.hand.length);p.hand.push(target.hand.splice(i,1)[0]);addLog(room,p.name+' grabbed a card from '+target.name+'.')}else addLog(room,p.name+' tried to grab a card, but found nothing.')}
-  else if(c.type==='lucky'){draw(room,p);addLog(room,p.name+' took a Lucky Fork draw.');nextTurn(room,1)}
-  else if(c.type==='safe'){addLog(room,p.name+' played Safe Bite.');nextTurn(room,1)}
+  if(c.type==='skip'){
+    addLog(room,p.name+' played Skip.');
+    nextTurn(room,1);
+  }else if(c.type==='double'){
+    addLog(room,p.name+' played Double Turn.');
+    nextTurn(room,2);
+  }else if(c.type==='peek'){
+    addLog(room,p.name+' scanned the mystery fork.');
+    nextTurn(room,1);
+  }else if(c.type==='deflect'){
+    addLog(room,p.name+' deflected the danger.');
+    nextTurn(room,2);
+  }else if(c.type==='steal'){
+    const target=room.players[(room.turn+1)%room.players.length];
+    if(target?.hand.length){
+      const i=Math.floor(Math.random()*target.hand.length);
+      p.hand.push(target.hand.splice(i,1)[0]);
+      addLog(room,p.name+' grabbed a card from '+target.name+'.');
+    }else{
+      addLog(room,p.name+' tried to grab a card, but found nothing.');
+    }
+    nextTurn(room,1);
+  }else if(c.type==='lucky'){
+    const result=drawAndResolve(room,p,'player');
+    if(!result.card){
+      addLog(room,p.name+' could not take a Lucky Fork draw.');
+      nextTurn(room,1);
+    }else if(!result.eliminated){
+      addLog(room,p.name+' took a Lucky Fork draw.');
+      nextTurn(room,1);
+    }
+  }else if(c.type==='safe'){
+    addLog(room,p.name+' played Safe Bite.');
+    nextTurn(room,1);
+  }
   res.json(publicState(room));
 });
 app.use((_req,res)=>res.sendFile(process.cwd()+'/public/index.html'));
