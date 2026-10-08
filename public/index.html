@@ -46,6 +46,7 @@ main{max-width:980px;margin:34px auto;padding:0 18px}.hero{border:1px solid var(
 <script>let roomCode='',playerId='',playerToken='',state=null,partyCode='',partyMemberId='',partyLeader=false,pollBusy=false,actionBusy=false;
 const SESSION_KEY='exploding-fork-session-v2';
 const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
 function show(id){
   document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
