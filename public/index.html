@@ -225,15 +225,16 @@ function render(){
     const cls=seatClass(i,state.players.length)+(i===state.turn?' current':'')+(p.id===playerId?' me':'');
     return '<div class="'+cls+'"><div class="seat-name">'+esc(p.name)+(p.bot?' · BOT':'')+(p.isLeader?' · LEADER':'')+'</div><div class="seat-meta">'+p.handCount+' cards</div>'+(i===state.turn?'<div class="seat-turn">● CURRENT TURN</div>':'')+(p.id===playerId?'<div class="seat-turn">YOU</div>':'')+'</div>';
   }).join('');
-  const peek=me?.peek;
+  const peek=state.viewerPeek||me?.peek;
+  const ownHand=Array.isArray(state.viewerHand)?state.viewerHand:(me?.hand||[]);
   $('peekText').innerHTML=peek?'<strong>PEEK:</strong> '+esc(peek.name):'';
-  $('hand').innerHTML=me?me.hand.map(c=>{
+  $('hand').innerHTML=state.viewerEliminated?'<div class="small">Your hand is closed because you are out.</div>':ownHand.map(c=>{
     const info=cardInfo(c.type);
     const reactive=c.type==='defuse'||c.type==='bomb';
     const disabled=reactive||!myTurn||actionBusy;
     const action=disabled?'':' onclick="playCard(\''+c.id+'\')"';
     return '<button class="card '+(c.type==='bomb'?'danger':'')+'"'+action+(disabled?' disabled':'')+'><span class="tag">'+esc(c.label)+'</span><strong>'+esc(c.name)+'</strong><em>'+esc(info[1])+'</em><span class="what">'+(reactive?'AUTOMATIC / REACTIVE':myTurn?'CLICK TO PLAY':'WAIT FOR YOUR TURN')+'</span></button>';
-  }).join(''):(state.viewerEliminated?'<div class="small">Your hand is closed because you are out.</div>':'<div class="small">Reconnecting to your hand…</div>');
+  }).join('');
   $('log').innerHTML=state.log.map(x=>'<div>'+esc(x.text)+'</div>').join('');
   $('log').scrollTop=$('log').scrollHeight;
 }
