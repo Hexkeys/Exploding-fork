@@ -258,8 +258,7 @@ function runBotTurn(room){
     }else{
       const result=drawAndResolve(room,bot);
       if(!result.card){
-        addLog(room,'Quantum Bot could not draw.');
-        advanceTurn(room,1);
+        addLog(room,'Quantum Bot could not draw. Its turn remains active.');
       }else if(!result.eliminated){
         addLog(room,'Quantum Bot drew a card.');
         advanceTurn(room,1);
