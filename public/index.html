@@ -25,7 +25,7 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid #35c963;backgro
 <header><div class="logo">[ QUANTUM // FORK ]</div><div class="status" id="roomPill">● NETWORK ONLINE</div></header>
 
 <section id="home" class="screen active">
-<div class="hero"><div class="dim">// PRIVATE FRIEND NETWORK</div><h2>QUANTUM<br><span>FORK</span><br>NODE.</h2><p>A quick multiplayer card battle where every draw could be your last. Play clever utility cards, dodge Fork Bombs, and be the last player holding the table together.</p><div class="actions"><button class="primary" onclick="show('create')">+ CREATE PARTY</button><button class="secondary" onclick="show('join')">+ JOIN PARTY</button></div></div>
+<div class="hero"><div class="dim">// PRIVATE FRIEND NETWORK</div><h2>QUANTUM<br><span>FORK</span><br>NODE.</h2><p>A quick multiplayer card battle where every draw could be your last. Play clever utility cards, dodge Fork Bombs, and be the last player holding the table together.</p><div class="actions"><button class="primary" onclick="show('create')">+ CREATE PARTY</button><button class="secondary" onclick="show('join')">+ JOIN PARTY</button><button class="secondary" onclick="show('bot')">+ PLAY WITH BOT</button></div></div>
 <div class="sectionBlock"><div class="dim">// FORK SIMULATION</div><div class="rules"><div class="rule">🛡️ <div><b>Shield the boom</b><small>Block a Fork Bomb and send it back into the deck.</small></div></div><div class="rule">👀 <div><b>Play your hand</b><small>Skip, deflect, scan, steal, or gamble for an extra draw.</small></div></div><div class="rule">🏆 <div><b>Last fork standing</b><small>Survive until everyone else hits a bomb.</small></div></div></div></div></div>
 <div class="footer">EXPLODING FORK // ORIGINAL QUANTUM-THEMED GAME SIMULATOR</div>
 </section>
@@ -33,6 +33,8 @@ button,input{font:inherit}button{cursor:pointer;border:1px solid #35c963;backgro
 <section id="create" class="screen"><div class="panel"><div class="bar"><h2>// CREATE QUANTUM PARTY</h2><button class="secondary" onclick="show('home')">Back</button></div><div class="field"><label>PARTY NAME</label><input id="partyName" maxlength="24" placeholder="Friday Forks"></div><div class="field"><label>YOUR NAME</label><input id="createName" maxlength="20" placeholder="Forkmaster"></div><button class="primary" onclick="createParty()">+ CREATE PARTY</button></div></section>
 
 <section id="join" class="screen"><div class="panel"><div class="bar"><h2>// JOIN QUANTUM PARTY</h2><button class="secondary" onclick="show('home')">Back</button></div><div class="field"><label>YOUR NAME</label><input id="joinName" maxlength="20" placeholder="Your name"></div><div class="field"><label>4-CHARACTER PARTY CODE</label><input id="joinCode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"></div><button class="primary" onclick="joinParty()">+ JOIN PARTY</button></div></section>
+
+<section id="bot" class="screen"><div class="panel"><div class="bar"><h2>// PLAY WITH QUANTUM BOT</h2><button class="secondary" onclick="show('home')">Back</button></div><div class="field"><label>YOUR NAME</label><input id="botName" maxlength="20" placeholder="Forkmaster"></div><button class="primary" onclick="playBot()">INITIALIZE SOLO MATCH</button><div class="small" style="margin-top:12px">You play against one Quantum Bot.</div></div></section>
 
 <section id="lobby" class="screen"><div class="panel"><div class="bar"><div><h2>// QUANTUM LOBBY</h2><div class="small">Broadcast this code to your crew.</div></div><button class="secondary" onclick="location.reload()">Leave</button></div><div class="code" id="code"></div><div class="players" id="lobbyPlayers"></div><button class="primary" onclick="launchParty()">INITIALIZE FORK</button><div class="small" style="margin-top:12px">2–6 players can play. Party codes are separate from game tables.</div></div></section>
 
@@ -45,9 +47,10 @@ const $=id=>document.getElementById(id);
 function show(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));$(id).classList.add('active')}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
 async function api(url,opts={}){const r=await fetch(url,{headers:{'content-type':'application/json'},...opts});const d=await r.json();if(!r.ok)throw Error(d.error||'Something went wrong');return d}
+async function playBot(){try{const name=$('botName').value.trim()||'Forkmaster';const r=await api('/api/bot-games',{method:'POST',body:JSON.stringify({name})});code=r.code;playerId=r.id;partyCode='';partyMemberId='';state=r.state;show('game');render()}catch(e){toast(e.message)}}
 async function createParty(){try{const name=$('createName').value.trim()||'Forkmaster';const partyName=$('partyName').value.trim()||'Fork Party';const r=await api('/api/parties',{method:'POST',body:JSON.stringify({name:partyName,hostName:name})});partyCode=r.party.code;partyMemberId=r.memberId;code=partyCode;show('lobby');await refreshParty()}catch(e){toast(e.message)}}
 async function joinParty(){try{partyCode=$('joinCode').value.trim().toUpperCase();const name=$('joinName').value.trim()||'Player';const r=await api('/api/parties/'+partyCode+'/join',{method:'POST',body:JSON.stringify({name})});partyMemberId=r.memberId;code=partyCode;show('lobby');await refreshParty()}catch(e){toast(e.message)}}
-async function refreshParty(){try{const r=await api('/api/parties/'+partyCode);$('roomPill').textContent='PARTY '+partyCode;$('code').textContent=partyCode;$('lobbyPlayers').innerHTML=r.party.members.map(m=>'<span class="player">'+esc(m.name)+'</span>').join('')}catch(e){toast(e.message)}}
+async function refreshParty(){try{const r=await api('/api/parties/'+partyCode);$('roomPill').textContent='PARTY '+partyCode;$('code').textContent=partyCode;$('lobbyPlayers').innerHTML=r.party.members.map(m=>'<span class="player">'+esc(m.name)+'</span>').join('');if(r.party.roomCode){code=r.party.roomCode;state=await api('/api/rooms/'+code);show('game');render()}}catch(e){toast(e.message)}}
 async function launchParty(){try{const r=await api('/api/parties/'+partyCode+'/launch',{method:'POST',body:JSON.stringify({memberId:partyMemberId})});code=r.code;playerId=partyMemberId;state=await api('/api/rooms/'+code);show('game');render()}catch(e){toast(e.message)}}
 async function createRoom(){try{const name=$('createName').value.trim()||'Forkmaster';const r=await api('/api/rooms',{method:'POST',body:'{}'});code=r.code;playerId=(await api('/api/rooms/'+code+'/join',{method:'POST',body:JSON.stringify({name})})).id;await refresh();show('lobby')}catch(e){toast(e.message)}}
 async function joinRoom(){try{code=$('joinCode').value.trim().toUpperCase();const name=$('joinName').value.trim()||'Player';const r=await api('/api/rooms/'+code+'/join',{method:'POST',body:JSON.stringify({name})});playerId=r.id;state=r.state;show(state.started?'game':'lobby');render()}catch(e){toast(e.message)}}
@@ -57,7 +60,7 @@ async function drawCard(){try{state=await api('/api/rooms/'+code+'/draw',{method
 async function playCard(id){try{state=await api('/api/rooms/'+code+'/play',{method:'POST',body:JSON.stringify({playerId,cardId:id})});render()}catch(e){toast(e.message)}}
 function render(){if(!state)return;$('roomPill').textContent=code?'TABLE '+code:'NO TABLE';$('code').textContent=code;
 $('lobbyPlayers').innerHTML=state.players.map(p=>'<span class="player">'+esc(p.name)+'</span>').join('');
-$('players').innerHTML=state.players.map((p,i)=>'<span class="player '+(i===state.turn?'current':'')+'">'+(i===state.turn?'⚡ ':'')+esc(p.name)+' · '+p.hand.length+' cards</span>').join('');
+$('players').innerHTML=state.players.map((p,i)=>'<span class="player '+(i===state.turn?'current':'')+'">'+(i===state.turn?'⚡ ':'')+esc(p.name)+(p.bot?' [BOT]':'')+' · '+p.hand.length+' cards</span>').join('');
 $('round').textContent=state.round;$('deckText').textContent='Deck: '+state.deckCount;
 const me=state.players.find(p=>p.id===playerId);const current=state.players[state.turn];$('turnText').textContent=state.winner?'🏆 '+state.winner+' wins!':current?(current.id===playerId?'⚡ YOUR TURN':'Waiting for '+current.name):'Game over';
 $('drawBtn').disabled=state.winner||!current||current.id!==playerId;
@@ -67,6 +70,6 @@ if(state.started)show('game');else if(code)show('lobby');
 }
 function cardText(t){return ({skip:'End your turn.',double:'Take another turn.',peek:'Inspect the danger.',deflect:'Pass the turn.',steal:'Grab a random card.',lucky:'Draw again safely.'})[t]||''}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-setInterval(()=>{if(partyCode&&!state?.started)refreshParty();else if(code)refresh()},1500);
+setInterval(async()=>{if(partyCode&&!state?.started)await refreshParty();else if(code)await refresh();if(state?.started&&state.players[state.turn]?.bot){try{state=await api('/api/rooms/'+code+'/bot-turn',{method:'POST',body:'{}'});render()}catch(e){}}},1200);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=3');
 </script></body></html>
