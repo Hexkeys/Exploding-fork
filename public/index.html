@@ -68,5 +68,5 @@ if(state.started)show('game');else if(code)show('lobby');
 function cardText(t){return ({skip:'End your turn.',double:'Take another turn.',peek:'Inspect the danger.',deflect:'Pass the turn.',steal:'Grab a random card.',lucky:'Draw again safely.'})[t]||''}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 setInterval(()=>{if(partyCode&&!state?.started)refreshParty();else if(code)refresh()},1500);
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=3');
 </script></body></html>
