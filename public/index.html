@@ -400,7 +400,6 @@ function render(){
     const cls=seatClass(i,state.players.length)+(i===state.turn?' current':'')+(p.id===playerId?' me':'');
     return '<div class="'+cls+'" data-player-id="'+esc(p.id)+'"><div class="seat-name">'+esc(p.name)+(p.bot?' · BOT':'')+(p.isLeader?' · LEADER':'')+'</div><div class="seat-meta">'+p.handCount+' cards</div>'+(i===state.turn?'<div class="seat-turn">● CURRENT TURN</div>':'')+(p.id===playerId?'<div class="seat-turn">YOU</div>':'')+'</div>';
   }).join('');
-  const =state.viewerPeek||me?.;
   const ownHand=Array.isArray(state.viewerHand)?state.viewerHand:(me?.hand||[]);
   $('peekText').innerHTML=?'<strong>:</strong> '+esc(.name):'';
   $('hand').innerHTML=state.viewerEliminated?'<div class="small">Your hand is closed because you are out.</div>':ownHand.length?ownHand.map(c=>{
