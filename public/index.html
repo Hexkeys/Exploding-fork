@@ -44,22 +44,98 @@ main{max-width:980px;margin:34px auto;padding:0 18px}.hero{border:1px solid var(
 <div id="toast" class="toast"></div>
 </main></div>
 <script>
-let code='',playerId='',state=null,partyCode='',partyMemberId='';
+let code='',playerId='',state=null,partyCode='',partyMemberId='',pollBusy=false,actionBusy=false;
 const $=id=>document.getElementById(id);
 function show(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));$(id).classList.add('active')}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
-async function api(url,opts={}){const r=await fetch(url,{headers:{'content-type':'application/json'},...opts});const d=await r.json();if(!r.ok)throw Error(d.error||'Something went wrong');return d}
-async function playBot(){try{const name=$('botName').value.trim()||'Forkmaster';const r=await api('/api/bot-games',{method:'POST',body:JSON.stringify({name})});code=r.code;playerId=r.id;partyCode='';partyMemberId='';state=r.state;show('game');render()}catch(e){toast(e.message)}}
-async function createParty(){try{const name=$('createName').value.trim()||'Forkmaster';const partyName=$('partyName').value.trim()||'Fork Party';const r=await api('/api/parties',{method:'POST',body:JSON.stringify({name:partyName,hostName:name})});partyCode=r.party.code;partyMemberId=r.memberId;code=partyCode;show('lobby');await refreshParty()}catch(e){toast(e.message)}}
-async function joinParty(){try{partyCode=$('joinCode').value.trim().toUpperCase();const name=$('joinName').value.trim()||'Player';const r=await api('/api/parties/'+partyCode+'/join',{method:'POST',body:JSON.stringify({name})});partyMemberId=r.memberId;code=partyCode;show('lobby');await refreshParty()}catch(e){toast(e.message)}}
-async function refreshParty(){try{const r=await api('/api/parties/'+partyCode);$('roomPill').textContent='PARTY '+partyCode;$('code').textContent=partyCode;$('lobbyPlayers').innerHTML=r.party.members.map(m=>'<span class="player">'+esc(m.name)+'</span>').join('');if(r.party.roomCode){code=r.party.roomCode;state=await api('/api/rooms/'+code);show('game');render()}}catch(e){toast(e.message)}}
-async function launchParty(){try{const r=await api('/api/parties/'+partyCode+'/launch',{method:'POST',body:JSON.stringify({memberId:partyMemberId})});code=r.code;playerId=partyMemberId;state=await api('/api/rooms/'+code);show('game');render()}catch(e){toast(e.message)}}
-async function createRoom(){try{const name=$('createName').value.trim()||'Forkmaster';const r=await api('/api/rooms',{method:'POST',body:'{}'});code=r.code;playerId=(await api('/api/rooms/'+code+'/join',{method:'POST',body:JSON.stringify({name})})).id;await refresh();show('lobby')}catch(e){toast(e.message)}}
-async function joinRoom(){try{code=$('joinCode').value.trim().toUpperCase();const name=$('joinName').value.trim()||'Player';const r=await api('/api/rooms/'+code+'/join',{method:'POST',body:JSON.stringify({name})});playerId=r.id;state=r.state;show(state.started?'game':'lobby');render()}catch(e){toast(e.message)}}
-async function refresh(){if(!code)return;try{state=await api('/api/rooms/'+code);render()}catch(e){toast(e.message)}}
-async function startGame(){try{state=await api('/api/rooms/'+code+'/start',{method:'POST',body:'{}'});show('game');render()}catch(e){toast(e.message)}}
-async function drawCard(){try{state=await api('/api/rooms/'+code+'/draw',{method:'POST',body:JSON.stringify({playerId})});render()}catch(e){toast(e.message)}}
-async function playCard(id){try{state=await api('/api/rooms/'+code+'/play',{method:'POST',body:JSON.stringify({playerId,cardId:id})});render()}catch(e){toast(e.message)}}
+async function api(url,opts={}){const r=await fetch(url,{cache:'no-store',headers:{'content-type':'application/json'},...opts});const d=await r.json();if(!r.ok)throw Error(d.error||'Something went wrong');return d}
+async function playBot(){if(actionBusy)return;actionBusy=true;try{const name=$('botName').value.trim()||'Forkmaster';const r=await api('/api/bot-games',{method:'POST',body:JSON.stringify({name})});code=r.code;playerId=r.id;partyCode='';partyMemberId='';state=r.state;show('game');render()}catch(e){toast(e.message)}finally{actionBusy=false}}
+async function createParty(){if(actionBusy)return;actionBusy=true;try{const name=$('createName').value.trim()||'Forkmaster';const partyName=$('partyName').value.trim()||'Fork Party';const r=await api('/api/parties',{method:'POST',body:JSON.stringify({name:partyName,hostName:name})});partyCode=r.party.code;partyMemberId=r.memberId;code=partyCode;show('lobby')}catch(e){toast(e.message)}finally{actionBusy=false;await refreshParty()}}
+async function joinParty(){if(actionBusy)return;actionBusy=true;try{partyCode=$('joinCode').value.trim().toUpperCase();const name=$('joinName').value.trim()||'Player';const r=await api('/api/parties/'+partyCode+'/join',{method:'POST',body:JSON.stringify({name})});partyMemberId=r.memberId;code=partyCode;show('lobby')}catch(e){toast(e.message)}finally{actionBusy=false;await refreshParty()}}
+async function refreshParty(){
+  if(!partyCode||pollBusy||actionBusy)return;
+  pollBusy=true;
+  try{
+    const r=await api('/api/parties/'+partyCode);
+    $('roomPill').textContent='PARTY '+partyCode;
+    $('code').textContent=partyCode;
+    $('lobbyPlayers').innerHTML=r.party.members.map(m=>'<span class="player">'+esc(m.name)+'</span>').join('');
+    if(r.party.roomCode){
+      code=r.party.roomCode;
+      state=await api('/api/rooms/'+code);
+      if(state.started)show('game');
+      render();
+    }
+  }catch(e){toast(e.message)}
+  finally{pollBusy=false}
+}
+async function launchParty(){
+  if(actionBusy)return;
+  actionBusy=true;
+  try{
+    const r=await api('/api/parties/'+partyCode+'/launch',{method:'POST',body:JSON.stringify({memberId:partyMemberId})});
+    code=r.code;
+    playerId=partyMemberId;
+    state=r.state||await api('/api/rooms/'+code);
+    show('game');
+    render();
+  }catch(e){toast(e.message)}
+  finally{actionBusy=false}
+}
+async function createRoom(){
+  if(actionBusy)return;
+  actionBusy=true;
+  try{
+    const name=$('createName').value.trim()||'Forkmaster';
+    const r=await api('/api/rooms',{method:'POST',body:'{}'});
+    code=r.code;
+    playerId=(await api('/api/rooms/'+code+'/join',{method:'POST',body:JSON.stringify({name})})).id;
+    await refresh();
+    show('lobby');
+  }catch(e){toast(e.message)}
+  finally{actionBusy=false}
+}
+async function joinRoom(){
+  if(actionBusy)return;
+  actionBusy=true;
+  try{
+    code=$('joinCode').value.trim().toUpperCase();
+    const name=$('joinName').value.trim()||'Player';
+    const r=await api('/api/rooms/'+code+'/join',{method:'POST',body:JSON.stringify({name})});
+    playerId=r.id;state=r.state;show(state.started?'game':'lobby');render();
+  }catch(e){toast(e.message)}
+  finally{actionBusy=false}
+}
+async function refresh(){
+  if(!code||pollBusy||actionBusy)return;
+  pollBusy=true;
+  try{
+    state=await api('/api/rooms/'+code);
+    render();
+  }catch(e){toast(e.message)}
+  finally{pollBusy=false}
+}
+async function startGame(){
+  if(actionBusy)return;
+  actionBusy=true;
+  try{state=await api('/api/rooms/'+code+'/start',{method:'POST',body:'{}'});show('game');render()}
+  catch(e){toast(e.message)}
+  finally{actionBusy=false}
+}
+async function drawCard(){
+  if(actionBusy||!playerId)return;
+  actionBusy=true;
+  try{state=await api('/api/rooms/'+code+'/draw',{method:'POST',body:JSON.stringify({playerId})});render()}
+  catch(e){toast(e.message)}
+  finally{actionBusy=false}
+}
+async function playCard(id){
+  if(actionBusy||!playerId)return;
+  actionBusy=true;
+  try{state=await api('/api/rooms/'+code+'/play',{method:'POST',body:JSON.stringify({playerId,cardId:id})});render()}
+  catch(e){toast(e.message)}
+  finally{actionBusy=false}
+}
 function seatClass(i,count){const maps={2:['seat','seat'],3:['seat','seat','seat'],4:['seat','seat','seat','seat'],5:['seat','seat','seat','seat','seat'],6:['seat','seat','seat','seat','seat','seat']};return maps[count]?.[i]||'seat'}
 function cardInfo(t){return ({bomb:['Fork Bomb','Reveals the dangerous card. A Shield can save you.'],shield:['Shield','Blocks a Fork Bomb when you draw one.'],skip:['Skip','End your turn without drawing.'],double:['Double Turn','Take another turn immediately.'],peek:['Peek','Inspect the danger ahead.'],deflect:['Deflect','Skip the next player and pass the turn.'],steal:['Steal','Take one random card from the next player.'],lucky:['Lucky Fork','Draw one extra card.'],safe:['Safe Bite','Play this utility card before your next draw.']})[t]||[t,'Utility card']}
 function render(){
@@ -97,8 +173,20 @@ function render(){
 
   $('log').innerHTML=state.log.map(x=>'<div>'+esc(x.text)+'</div>').join('');
   $('log').scrollTop=$('log').scrollHeight;
-  if(state.started)show('game');else if(code)show('lobby');
 }
-setInterval(async()=>{if(partyCode&&!state?.started)await refreshParty();else if(code)await refresh();if(state?.started&&state.players[state.turn]?.bot){try{state=await api('/api/rooms/'+code+'/bot-turn',{method:'POST',body:'{}'});render()}catch(e){}}},1200);
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=3');
+async function pollGame(){
+  if(actionBusy||pollBusy)return;
+  if(partyCode&&!state?.started)await refreshParty();
+  else if(code)await refresh();
+  if(actionBusy||pollBusy)return;
+  if(state?.started&&state.players[state.turn]?.bot){
+    actionBusy=true;
+    try{state=await api('/api/rooms/'+code+'/bot-turn',{method:'POST',body:'{}'});render()}
+    catch(e){toast(e.message)}
+    finally{actionBusy=false}
+  }
+}
+setInterval(pollGame,1500);
+pollGame();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=4');
 </script></body></html>
