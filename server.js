@@ -85,8 +85,8 @@ app.post('/api/parties/:code/launch',(req,res)=>{
   if(!party.members.some(m=>m.id===memberId))return res.status(403).json({error:'You are not in this party.'});
   if(party.roomCode){return res.json({code:party.roomCode});}
   let code=makeCode(),host=party.hostId;
-  rooms.set(code,{code,partyCode:party.code,host,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,name:m.name,hand:[]})),deck:[],discard:[],log:[]});
-  party.roomCode=code;res.json({code,started:false});
+  const room={code,partyCode:party.code,host,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,name:m.name,hand:[]})),deck:[],discard:[],log:[]};
+  rooms.set(code,room);startGame(room);party.roomCode=code;res.json({code,started:true,state:publicState(room)});
 });
 
 app.post('/api/bot-games',(req,res)=>{
