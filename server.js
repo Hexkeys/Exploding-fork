@@ -40,7 +40,7 @@ function publicState(room){
   return {
     code:room.code,started:room.started,turn:room.turn,round:room.round,winner:room.winner,
     partyCode:room.partyCode,
-    players:room.players.map(p=>({id:p.id,name:p.name,hand:p.hand.map(c=>({id:c.id,name:c.name,label:c.label,type:c.type}))})),
+    players:room.players.map(p=>({id:p.id,name:p.name,bot:!!p.bot,hand:p.hand.map(c=>({id:c.id,name:c.name,label:c.label,type:c.type}))})),
     log:room.log.slice(-30),deckCount:room.deck.length,
     top:room.deck.length?{name:'Mystery Fork',label:'?',type:'mystery'}:null
   };
@@ -81,10 +81,54 @@ app.get('/api/parties/:code',(req,res)=>{
 app.post('/api/parties/:code/launch',(req,res)=>{
   const party=parties.get(cleanCode(req.params.code));if(!party)return res.status(404).json({error:'Party not found.'});
   if(party.members.length<2)return res.status(400).json({error:'A party needs at least 2 players.'});
+  const memberId=String(req.body?.memberId||'');
+  if(!party.members.some(m=>m.id===memberId))return res.status(403).json({error:'You are not in this party.'});
   if(party.roomCode){return res.json({code:party.roomCode});}
   let code=makeCode(),host=party.hostId;
   rooms.set(code,{code,partyCode:party.code,host,started:false,turn:0,round:0,winner:null,players:party.members.map(m=>({id:m.id,name:m.name,hand:[]})),deck:[],discard:[],log:[]});
-  party.roomCode=code;res.json({code});
+  party.roomCode=code;res.json({code,started:false});
+});
+
+app.post('/api/bot-games',(req,res)=>{
+  const code=makeCode(),id=crypto.randomUUID();
+  const botId='bot-'+crypto.randomUUID();
+  const room={code,partyCode:null,host:id,started:false,turn:0,round:0,winner:null,players:[
+    {id,name:cleanName(req.body?.name||'Player'),hand:[],bot:false},
+    {id:botId,name:'Quantum Bot',hand:[],bot:true}
+  ],deck:[],discard:[],log:[]};
+  rooms.set(code,room);startGame(room);addLog(room,'Quantum Bot is connected.');
+  res.status(201).json({code,id,state:publicState(room)});
+});
+
+function runBotTurn(room){
+  const bot=room.players[room.turn];
+  if(!bot?.bot||!room.started)return false;
+  const actionCards=bot.hand.filter(c=>['skip','double','deflect','peek','steal','lucky','safe'].includes(c.type));
+  if(actionCards.length && Math.random()<0.7){
+    const c=actionCards[Math.floor(Math.random()*actionCards.length)];
+    bot.hand=bot.hand.filter(x=>x.id!==c.id);room.discard.push(c);
+    if(c.type==='skip'){addLog(room,'Quantum Bot played Skip.');nextTurn(room,1)}
+    else if(c.type==='double'){addLog(room,'Quantum Bot played Double Turn.');nextTurn(room,2)}
+    else if(c.type==='peek'){addLog(room,'Quantum Bot scanned the deck.');nextTurn(room,1)}
+    else if(c.type==='deflect'){addLog(room,'Quantum Bot deflected the danger.');nextTurn(room,2)}
+    else if(c.type==='steal'){const target=room.players.find(p=>!p.bot);if(target?.hand.length){const i=Math.floor(Math.random()*target.hand.length);bot.hand.push(target.hand.splice(i,1)[0]);addLog(room,'Quantum Bot stole a card.');}nextTurn(room,1)}
+    else if(c.type==='lucky'){draw(room,bot);addLog(room,'Quantum Bot took a Lucky Fork draw.');nextTurn(room,1)}
+    else {addLog(room,'Quantum Bot played Safe Bite.');nextTurn(room,1)}
+  }else{
+    draw(room,bot);const c=bot.hand[bot.hand.length-1];
+    if(!c)return true;
+    if(c.type==='bomb'){
+      const shield=bot.hand.findIndex(x=>x.type==='shield');
+      if(shield>=0){bot.hand.splice(shield,1);bot.hand.pop();room.discard.push(c);const at=Math.floor(Math.random()*(room.deck.length+1));room.deck.splice(at,0,{...c,id:crypto.randomUUID()});addLog(room,'Quantum Bot blocked a Fork Bomb.');nextTurn(room,1)}
+      else{bot.hand.pop();room.discard.push(c);addLog(room,'Quantum Bot hit the Fork Bomb.');room.players.splice(room.turn,1);if(room.players.length===1){room.winner=room.players[0].name;room.started=false;addLog(room,room.winner+' wins the fork!');}else if(room.turn>=room.players.length)room.turn=0;}
+    }else{room.discard.push(c);addLog(room,'Quantum Bot drew a card.');nextTurn(room,1)}
+  }
+  return true;
+}
+app.post('/api/rooms/:code/bot-turn',(req,res)=>{
+  const room=rooms.get(cleanCode(req.params.code));if(!room||!room.started)return res.status(400).json({error:'Game is not active.'});
+  if(!room.players[room.turn]?.bot)return res.status(400).json({error:'It is not the bot turn.'});
+  runBotTurn(room);res.json(publicState(room));
 });
 
 app.post('/api/rooms',(req,res)=>{
