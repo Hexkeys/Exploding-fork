@@ -250,7 +250,6 @@ function runBotTurn(room){
           bot.hand.push(target.hand.splice(i,1)[0]);
           addLog(room,'Quantum Bot stole a card.');
         }else addLog(room,'Quantum Bot found nothing to steal.');
-        advanceTurn(room,1);
       }else if(c.type==='lucky'){
         const result=drawAndResolve(room,bot);
         if(!result.eliminated)advanceTurn(room,1);
@@ -341,10 +340,10 @@ app.post('/api/rooms/:code/play',(req,res)=>{
   if(c.type==='defuse'||c.type==='bomb')return res.status(400).json({error:'That card is reactive or drawn automatically.'});
   room.discard.push({...c,id:newId()});
   if(c.type==='skip'){
-    addLog(room,player.name+' played Skip.');advanceTurn(room,1);
+    addLog(room,player.name+' played Skip. Your turn continues until you draw.');
   }else if(c.type==='double'){
-    addLog(room,player.name+' played Double Turn.');room.round++;touch(room); }else if(c.type==='deflect'){
-    addLog(room,player.name+' deflected the danger.');advanceTurn(room,2);
+    addLog(room,player.name+' played Double Turn. Your turn continues until you draw.');touch(room); }else if(c.type==='deflect'){
+    addLog(room,player.name+' played Deflect. Your turn continues until you draw.');
   }else if(c.type==='steal'){
     const target=room.players[(room.turn+1)%room.players.length];
     if(target?.hand.length){
@@ -352,7 +351,6 @@ app.post('/api/rooms/:code/play',(req,res)=>{
       player.hand.push(target.hand.splice(i,1)[0]);
       addLog(room,player.name+' grabbed a card from '+target.name+'.');
     }else addLog(room,player.name+' tried to grab a card, but found nothing.');
-    advanceTurn(room,1);
   }else if(c.type==='lucky'){
     const result=drawAndResolve(room,player);
     if(!result.eliminated)advanceTurn(room,1);
