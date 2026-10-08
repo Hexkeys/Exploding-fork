@@ -330,11 +330,6 @@ function animateCardFlight(card,fromEl,toEl,kind='play',fromRect=null){
     anim.onfinish=()=>ghost.remove();
   });
 }
-function shoveSeat(id){
-  const seat=$('tableSeats')?.querySelector('[data-player-id="'+id+'"]');if(!seat)return;
-  seat.classList.remove('seat-shove');void seat.offsetWidth;seat.classList.add('seat-shove');
-  setTimeout(()=>seat.classList.remove('seat-shove'),700);
-}
 async function drawCard(){
   if(actionBusy||!playerId||!roomCode)return;
   const before=new Set(getOwnCards().map(c=>c.id));
@@ -355,8 +350,6 @@ async function playCard(id){
   const card=getOwnCards().find(c=>c.id===id);
   const from=findHandCardEl(id);
   const fromRect=from?.getBoundingClientRect()||null;
-  const oldPlayers=state?.players||[],oldTurn=state?.turn??-1;
-  const skippedTarget=card?.type==='skip'&&oldPlayers.length?oldPlayers[(oldTurn+1)%oldPlayers.length]?.id:null;
   actionBusy=true;
   try{
     state=await api('/api/rooms/'+roomCode+'/play',{method:'POST',body:JSON.stringify({playerId,cardId:id})});
@@ -364,16 +357,15 @@ async function playCard(id){
     if(card&&fromRect)requestAnimationFrame(()=>animateCardFlight(card,null,$('deckVisual'),'play',fromRect));
     const reaction=reactionFor(card?.type);
     if(reaction)showReaction(reaction[0],reaction[1]);
-    if(skippedTarget)shoveSeat(skippedTarget);
   }catch(e){toast(e.message)}
   finally{actionBusy=false}
 }
 function cardInfo(t){return ({
   bomb:['Fork Bomb','Reveals the dangerous card. Your Defuse can save you.'],
   defuse:['Defuse','Automatically blocks a Fork Bomb when you draw one.'],
-  skip:['Skip','End your turn without drawing.'],
-  double:['Double Turn','Take another turn immediately.'],
-  deflect:['Deflect','Skip the next player and pass the turn.'],
+  skip:['Skip','Discard it without drawing. Your turn continues.'],
+  double:['Double Turn','Play it before drawing. It does not end your turn.'],
+  deflect:['Deflect','Play it before drawing. Your turn continues.'],
   steal:['Steal','Take one random card from the next player.'],
   lucky:['Lucky Fork','Draw one extra card, with normal bomb/Defuse rules.'],
   safe:['Safe Bite','Take a guaranteed safe card, then end your turn.']
