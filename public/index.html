@@ -316,10 +316,13 @@ function render(){
   const ownHand=Array.isArray(state.viewerHand)?state.viewerHand:(me?.hand||[]);
   $('peekText').innerHTML=peek?'<strong>PEEK:</strong> '+esc(peek.name):'';
   $('hand').innerHTML=state.viewerEliminated?'<div class="small">Your hand is closed because you are out.</div>':ownHand.length?ownHand.map(c=>{
-    const info=cardInfo(c.type),reactive=c.type==='defuse'||c.type==='bomb',disabled=reactive||!myTurn||actionBusy,action=disabled?'':' onclick="playCard(''+c.id+'')"';
-    return '<button class="card '+(c.type==='bomb'?'danger':'')+'" data-card-id="'+esc(c.id)+'"'+action+(disabled?' disabled':'')+'><span class="tag">'+esc(c.label)+'</span><strong>'+esc(c.name)+'</strong><em>'+esc(info[1])+'</em><span class="what">'+(reactive?'AUTOMATIC / REACTIVE':myTurn?'CLICK TO PLAY':'WAIT FOR YOUR TURN')+'</span></button>';
+    const info=cardInfo(c.type),reactive=c.type==='defuse'||c.type==='bomb',disabled=reactive||!myTurn||actionBusy;
+    return '<button class="card '+(c.type==='bomb'?'danger':'')+'" data-card-id="'+esc(c.id)+'"'+(disabled?' disabled':'')+'><span class="tag">'+esc(c.label)+'</span><strong>'+esc(c.name)+'</strong><em>'+esc(info[1])+'</em><span class="what">'+(reactive?'AUTOMATIC / REACTIVE':myTurn?'CLICK TO PLAY':'WAIT FOR YOUR TURN')+'</span></button>';
   }).join(''):'<div class="hand-empty">NO CARDS IN HAND</div>';
   const globalLog=Array.isArray(state.log)?state.log:[],privateLog=Array.isArray(state.viewerPrivateLog)?state.viewerPrivateLog:[];
+  $('hand').querySelectorAll('[data-card-id]').forEach(el=>{
+    if(!el.disabled)el.addEventListener('click',()=>playCard(el.dataset.cardId));
+  });
   $('log').innerHTML=globalLog.map(x=>'<div>'+esc(x.text)+'</div>').join('')+privateLog.map(x=>'<div class="private-log">YOU // '+esc(x)+'</div>').join('');
   $('log').scrollTop=$('log').scrollHeight;
 }
