@@ -178,12 +178,12 @@ function startGame(room){
     room.players[i].hand=[cardFromTuple(['Defuse','SAVE','defuse']),...openingSafe.slice(i*7,i*7+7)];
   }
   const deckConfig={
-    2:{size:50,bombs:1},
-    3:{size:100,bombs:2},
-    4:{size:150,bombs:4},
-    5:{size:200,bombs:6},
-    6:{size:250,bombs:8}
-  }[playerCount]||{size:50,bombs:1};
+    2:{size:25,bombs:1},
+    3:{size:50,bombs:2},
+    4:{size:75,bombs:3},
+    5:{size:100,bombs:4},
+    6:{size:150,bombs:6}
+  }[playerCount]||{size:25,bombs:1};
   const deck=Array.from({length:deckConfig.size-deckConfig.bombs},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
   for(let i=0;i<deckConfig.bombs;i++)deck.push(cardFromTuple(['Fork Bomb','BOOM','bomb']));
   room.deck=shuffle(deck);
@@ -262,8 +262,9 @@ function runBotTurn(room){
         addLog(room,'Quantum Bot played Double Turn. Its turn continues until it draws.');
         touch(room);
       }else if(c.type==='deflect'){
-        addLog(room,'Quantum Bot played Deflect. It skipped the next player.');
-        advanceTurn(room,2);
+        const steps=room.players.length===2?1:2;
+        addLog(room,'Quantum Bot played Deflect. '+(steps===1?'Turn passed to the other player.':'It skipped the next player.'));
+        advanceTurn(room,steps);
       }else if(c.type==='steal'){
         if(target?.hand.length){
           const i=Math.floor(Math.random()*target.hand.length);
@@ -367,8 +368,9 @@ app.post('/api/rooms/:code/play',(req,res)=>{
     advanceTurn(room,1);
   }else if(c.type==='double'){
     addLog(room,player.name+' played Double Turn. Your turn continues until you draw.');touch(room); }else if(c.type==='deflect'){
-    addLog(room,player.name+' played Deflect. It skipped the next player.');
-    advanceTurn(room,2);
+    const steps=room.players.length===2?1:2;
+    addLog(room,player.name+' played Deflect. '+(steps===1?'Turn passed to the other player.':'It skipped the next player.'));
+    advanceTurn(room,steps);
   }else if(c.type==='steal'){
     const target=room.players[(room.turn+1)%room.players.length];
     if(target?.hand.length){
