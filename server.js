@@ -62,10 +62,24 @@ function publicState(room,viewerId=null,viewerToken=null){
       handCount:p.hand.length,
       hand:(p.id===viewerId&&p.token===viewerToken)?p.hand.map(c=>({id:c.id,name:c.name,label:c.label,type:c.type})):[]
     })),
-    log:room.log.slice(-30),deckCount:room.deck.length
+    log:room.log.slice(-30).map(entry=>{
+      const visible={id:entry.id,text:entry.text,at:entry.at,type:entry.type};
+      if(entry.type==='bomb-hit'||entry.type==='bomb-defused'){
+        visible.playerId=entry.playerId;
+        visible.playerName=entry.playerName;
+      }else if(entry.type==='card-stolen'&&(entry.actorId===viewerId||entry.targetId===viewerId)){
+        visible.actorId=entry.actorId;
+        visible.targetId=entry.targetId;
+        visible.actorName=entry.actorName;
+        visible.targetName=entry.targetName;
+        visible.cardName=entry.cardName;
+        visible.cardLabel=entry.cardLabel;
+      }
+      return visible;
+    }),deckCount:room.deck.length
   };
 }
-function addLog(room,text,type='info'){room.log.push({id:newId(),text,at:Date.now(),type});room.updatedAt=Date.now();}
+function addLog(room,text,type='info',details={}){room.log.push({id:newId(),text,at:Date.now(),type,...details});room.updatedAt=Date.now();}
 function touch(room){room.updatedAt=Date.now();}
 function advanceTurn(room,steps=1){
   if(!room.players.length)return;
@@ -118,11 +132,11 @@ function drawAndResolve(room,p){
     p.hand.splice(defuseIndex,1);
     p.hand.pop();
     reinsertBomb(room,card);
-    addLog(room,p.name+' found a Fork Bomb and used a Defuse.','bomb-defused');
+    addLog(room,p.name+' found a Fork Bomb and used a Defuse.','bomb-defused',{playerId:p.id,playerName:p.name});
     return {card,eliminated:false,defused:true};
   }
   p.hand.pop();
-  addLog(room,p.name+' hit a Fork Bomb and is out.','bomb-hit');
+  addLog(room,p.name+' hit a Fork Bomb and is out.','bomb-hit',{playerId:p.id,playerName:p.name});
   const index=room.players.findIndex(x=>x.id===p.id);
   if(index>=0)eliminatePlayer(room,index);
   return {card,eliminated:true,defused:false};
@@ -253,8 +267,12 @@ function runBotTurn(room){
       }else if(c.type==='steal'){
         if(target?.hand.length){
           const i=Math.floor(Math.random()*target.hand.length);
-          bot.hand.push(target.hand.splice(i,1)[0]);
-          addLog(room,'Quantum Bot stole a card.');
+          const stolen=target.hand.splice(i,1)[0];
+          bot.hand.push(stolen);
+          addLog(room,'Quantum Bot stole a card from '+target.name+'.','card-stolen',{
+            actorId:bot.id,targetId:target.id,actorName:bot.name,targetName:target.name,
+            cardName:stolen.name,cardLabel:stolen.label
+          });
         }else addLog(room,'Quantum Bot found nothing to steal.');
       }else if(c.type==='lucky'){
         const result=drawAndResolve(room,bot);
@@ -355,8 +373,12 @@ app.post('/api/rooms/:code/play',(req,res)=>{
     const target=room.players[(room.turn+1)%room.players.length];
     if(target?.hand.length){
       const i=Math.floor(Math.random()*target.hand.length);
-      player.hand.push(target.hand.splice(i,1)[0]);
-      addLog(room,player.name+' grabbed a card from '+target.name+'.');
+      const stolen=target.hand.splice(i,1)[0];
+      player.hand.push(stolen);
+      addLog(room,player.name+' stole a card from '+target.name+'.','card-stolen',{
+        actorId:player.id,targetId:target.id,actorName:player.name,targetName:target.name,
+        cardName:stolen.name,cardLabel:stolen.label
+      });
     }else addLog(room,player.name+' tried to grab a card, but found nothing.');
   }else if(c.type==='lucky'){
     const result=drawAndResolve(room,player);
