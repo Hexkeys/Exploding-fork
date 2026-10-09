@@ -1,4 +1,4 @@
-const CACHE='exploding-fork-v14';
+const CACHE='exploding-fork-v15';
 const APP_SHELL=['/','/index.html','/manifest.webmanifest','/icon.svg'];
 
 self.addEventListener('install',event=>{
