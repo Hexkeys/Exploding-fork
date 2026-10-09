@@ -186,7 +186,18 @@ function startGame(room){
   }[playerCount]||{size:25,bombs:1};
   const deck=Array.from({length:deckConfig.size-deckConfig.bombs},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
   for(let i=0;i<deckConfig.bombs;i++)deck.push(cardFromTuple(['Fork Bomb','BOOM','bomb']));
-  room.deck=shuffle(deck);
+  // Keep bomb cards at fixed, evenly spaced draw positions for each game.
+  const bombPositions=Array.from({length:deckConfig.bombs},(_,i)=>
+    Math.floor((i+1)*(deckConfig.size+1)/(deckConfig.bombs+1))-1
+  );
+  const shuffledSafeCards=shuffle(deck.filter(card=>card.type!=='bomb'));
+  const fixedDeck=Array(deckConfig.size);
+  bombPositions.forEach(position=>{fixedDeck[position]=cardFromTuple(['Fork Bomb','BOOM','bomb'])});
+  let safeIndex=0;
+  for(let i=0;i<fixedDeck.length;i++){
+    if(!fixedDeck[i])fixedDeck[i]=shuffledSafeCards[safeIndex++];
+  }
+  room.deck=fixedDeck;
   addLog(room,'Game started. Each player starts with 1 Defuse and 7 random cards.');
 }
 
