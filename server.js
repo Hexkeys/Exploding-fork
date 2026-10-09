@@ -187,9 +187,11 @@ function startGame(room){
   const deck=Array.from({length:deckConfig.size-deckConfig.bombs},()=>cardFromTuple(pool[Math.floor(Math.random()*pool.length)]));
   for(let i=0;i<deckConfig.bombs;i++)deck.push(cardFromTuple(['Fork Bomb','BOOM','bomb']));
   // Keep bomb cards at fixed, evenly spaced draw positions for each game.
-  const bombPositions=Array.from({length:deckConfig.bombs},(_,i)=>
-    Math.floor((i+1)*(deckConfig.size+1)/(deckConfig.bombs+1))-1
-  );
+  // Randomize bomb locations while keeping them at distinct, fixed slots for this game.
+  const bombPositions=Array.from({length:deckConfig.size},(_,i)=>i)
+    .sort(()=>Math.random()-0.5)
+    .slice(0,deckConfig.bombs)
+    .sort((a,b)=>a-b);
   const shuffledSafeCards=shuffle(deck.filter(card=>card.type!=='bomb'));
   const fixedDeck=Array(deckConfig.size);
   bombPositions.forEach(position=>{fixedDeck[position]=cardFromTuple(['Fork Bomb','BOOM','bomb'])});
