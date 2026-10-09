@@ -110,6 +110,12 @@ body.bomb-screen-shake .wrap{animation:bombScreenShake 1.2s cubic-bezier(.36,.07
 .seat.me::before{content:"YOU ARE HERE";position:absolute;right:8px;top:-11px;padding:3px 6px;border:1px solid var(--green);border-radius:999px;background:#041008;color:var(--green);font-size:8px;font-weight:900;letter-spacing:1px}
 .explosion-overlay{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at center,#fff8 0,#39ff7233 22%,#ffb00022 42%,#020b05ee 78%);z-index:120;pointer-events:none;animation:screenBlast 1.8s ease-out forwards}
 .explosion-ring{width:16vw;height:16vw;min-width:110px;min-height:110px;border:8px solid #fff;border-radius:50%;box-shadow:0 0 30px #fff,0 0 80px #39ff72aa,0 0 150px #ffb00077;animation:ringBlast .9s cubic-bezier(.1,.8,.2,1) forwards}
+.explosion-flash{position:absolute;width:100%;height:100%;background:radial-gradient(circle,#fff 0,#ffe7a0 7%,#ff6a00aa 20%,transparent 58%);animation:flashBlast .65s ease-out forwards}
+.explosion-core{position:absolute;width:44px;height:44px;border-radius:50%;background:#fff;box-shadow:0 0 22px 12px #fff,0 0 65px 28px #ffb000,0 0 120px 45px #ff3d00;animation:coreBlast .8s cubic-bezier(.1,.8,.2,1) forwards}
+.explosion-spark{position:absolute;width:8px;height:clamp(70px,12vw,150px);border-radius:999px;background:linear-gradient(to top,#ff3d00,#ffd166 55%,#fff);box-shadow:0 0 12px #ffb000;transform:rotate(var(--spark-angle)) translateY(-35px) scaleY(.1);transform-origin:center;animation:sparkBlast .95s cubic-bezier(.1,.8,.2,1) forwards}
+@keyframes flashBlast{0%{opacity:0;transform:scale(.1)}12%{opacity:1;transform:scale(1.1)}100%{opacity:0;transform:scale(1.6)}}
+@keyframes coreBlast{0%{opacity:0;transform:scale(.1)}18%{opacity:1;transform:scale(1.3)}100%{opacity:0;transform:scale(.15)}}
+@keyframes sparkBlast{0%{opacity:0;transform:rotate(var(--spark-angle)) translateY(-15px) scaleY(.1)}15%{opacity:1}100%{opacity:0;transform:rotate(var(--spark-angle)) translateY(-170px) scaleY(1)}}
 .explosion-text{position:absolute;color:#fff;text-shadow:0 0 12px #39ff72;font-size:clamp(24px,6vw,64px);font-weight:1000;letter-spacing:5px;animation:boomText .9s ease-out forwards}
 @keyframes meSeatGlow{from{box-shadow:0 0 0 2px #39ff7222,0 0 18px #39ff7244}to{box-shadow:0 0 0 4px #39ff7255,0 0 42px #39ff72aa}}
 @keyframes screenBlast{0%{opacity:0}8%{opacity:1}60%{opacity:.92}100%{opacity:0}}
@@ -152,7 +158,7 @@ body.bomb-screen-shake .wrap{animation:bombScreenShake 1.2s cubic-bezier(.36,.07
 <div id="toast" class="toast"></div>
 </main></div>
 <script>let roomCode='',playerId='',playerToken='',state=null,partyCode='',partyMemberId='',partyLeader=false,pollBusy=false,actionBusy=false;
-let seenGameEventIds=new Set(),gameEventsPrimed=false,gameAlertQueue=[],gameAlertVisible=false,lastSeatSnapshots=new Map();
+let seenGameEventIds=new Set(),gameEventsPrimed=false,gameAlertQueue=[],gameAlertVisible=false,gameAlertTimer=null,gameAlertNotBefore=0,lastSeatSnapshots=new Map();
 const SESSION_KEY='exploding-fork-session-v2';
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -207,13 +213,15 @@ async function createParty(){
   finally{actionBusy=false}
 }
 async function joinParty(){
-  if(actionBusy)return;actionBusy=true;
+  if(actionBusy)return;
+  const code=$('joinCode').value.trim().toUpperCase();
+  if(!/^[A-Z0-9]{4}$/.test(code)){toast('Enter a valid 4-character party code.');return}
+  actionBusy=true;
   try{
-    partyCode=$('joinCode').value.trim().toUpperCase();
     const name=$('joinName').value.trim()||'Player';
-    const r=await api('/api/parties/'+partyCode+'/join',{method:'POST',body:JSON.stringify({name})});
+    const r=await api('/api/parties/'+code+'/join',{method:'POST',body:JSON.stringify({name})});
     const me=r.party.members.find(m=>m.id===r.memberId);
-    setSession({roomCode:'',playerId:r.memberId,playerToken:r.token,partyCode,partyMemberId:r.memberId,partyLeader:!!me?.isLeader});
+    setSession({roomCode:'',playerId:r.memberId,playerToken:r.token,partyCode:code,partyMemberId:r.memberId,partyLeader:!!me?.isLeader});
     show('lobby');renderParty(r.party);
   }catch(e){toast(e.message)}
   finally{actionBusy=false}
@@ -227,25 +235,31 @@ function renderParty(party){
 }
 async function refreshParty(){
   if(!partyCode||pollBusy||actionBusy)return;
+  const requestedPartyCode=partyCode,requestedMemberId=partyMemberId,requestedPlayerId=playerId;
   pollBusy=true;
   try{
-    const r=await api('/api/parties/'+partyCode);
-    const me=r.party.members.find(m=>m.id===partyMemberId);
-    partyLeader=!!me?.isLeader;saveSession();
-    renderParty(r.party);
+    const r=await api('/api/parties/'+requestedPartyCode);
+    if(partyCode!==requestedPartyCode||partyMemberId!==requestedMemberId||playerId!==requestedPlayerId)return;
+    const me=r.party.members.find(m=>m.id===requestedMemberId);
+    if(!me){toast('Your party membership could not be confirmed. Rejoin the party with its code.');return}
+    partyLeader=!!me.isLeader;saveSession();renderParty(r.party);
     if(r.party.roomCode){
       roomCode=r.party.roomCode;saveSession();
       try{
-        state=await api('/api/rooms/'+roomCode+'?playerId='+encodeURIComponent(playerId));
-        show('game');render();
+        const nextState=await api('/api/rooms/'+r.party.roomCode+'?playerId='+encodeURIComponent(requestedPlayerId));
+        if(partyCode!==requestedPartyCode||partyMemberId!==requestedMemberId||playerId!==requestedPlayerId)return;
+        state=nextState;show('game');render();
       }catch(e){
+        if(partyCode!==requestedPartyCode||partyMemberId!==requestedMemberId||playerId!==requestedPlayerId)return;
         if(/session expired|player authorization failed|room not found/i.test(String(e?.message||''))){
-          clearSession();roomCode='';partyCode='';partyMemberId='';partyLeader=false;state=null;show('home');
+          toast('Could not reconnect to the game. Your party session is being kept so you can retry.');
+          roomCode='';saveSession();show('lobby');
         }else toast(e.message);
       }
     }
   }catch(e){
-    if(/not found|already started|authorization/i.test(e.message)){clearSession();roomCode='';partyCode='';state=null;show('home');}
+    if(partyCode!==requestedPartyCode||partyMemberId!==requestedMemberId||playerId!==requestedPlayerId)return;
+    if(/not found|already started|authorization/i.test(e.message))toast('Could not refresh this party. Your session is kept; try again in a moment.');
     else toast(e.message);
   }finally{pollBusy=false}
 }
@@ -282,18 +296,19 @@ async function joinRoom(){
 }
 async function refresh(){
   if(!roomCode||pollBusy||actionBusy)return;
+  const requestedRoomCode=roomCode,requestedPlayerId=playerId;
   pollBusy=true;
   try{
-    state=await api('/api/rooms/'+roomCode+'?playerId='+encodeURIComponent(playerId));
-    render();
+    const nextState=await api('/api/rooms/'+requestedRoomCode+'?playerId='+encodeURIComponent(requestedPlayerId));
+    if(roomCode!==requestedRoomCode||playerId!==requestedPlayerId)return;
+    state=nextState;render();
   }catch(e){
+    if(roomCode!==requestedRoomCode||playerId!==requestedPlayerId)return;
     const msg=String(e?.message||'Request failed');
     if(/session expired|player authorization failed|room not found/i.test(msg)){
-      clearSession();roomCode='';playerId='';playerToken='';partyCode='';partyMemberId='';partyLeader=false;state=null;show('home');
-    }else{
-      toast(msg);
-      if(state)render();
-    }
+      if(partyCode){toast('The room is reconnecting. Your party session is kept.');roomCode='';saveSession();show('lobby');}
+      else{clearSession();roomCode='';playerId='';playerToken='';partyCode='';partyMemberId='';partyLeader=false;state=null;show('home');}
+    }else{toast(msg);if(state)render()}
   }finally{pollBusy=false}
 }
 async function startGame(){
@@ -333,7 +348,8 @@ function showExplosion(playerId,playerName){
   const el=document.createElement('div');
   el.className='explosion-overlay player-explosion';
   el.style.left=x+'px';el.style.top=y+'px';
-  el.innerHTML='<div class="explosion-ring"></div><div class="explosion-text">'+esc(String(playerName||'PLAYER').toUpperCase())+' EXPLODED!</div>';
+  const sparks=Array.from({length:14},(_,i)=>'<i class="explosion-spark" style="--spark-angle:'+Math.round(i*360/14)+'deg"></i>').join('');
+  el.innerHTML='<div class="explosion-flash"></div><div class="explosion-core"></div><div class="explosion-ring"></div>'+sparks+'<div class="explosion-text">'+esc(String(playerName||'PLAYER').toUpperCase())+' EXPLODED!</div>';
   layer.appendChild(el);
   setTimeout(()=>{el.remove();if(ghost)ghost.remove();if(seat)seat.classList.remove('seat-exploding')},2000);
 }
@@ -345,6 +361,12 @@ function showDefuseEffect(playerId){
 }
 function presentNextGameAlert(){
   if(gameAlertVisible||!gameAlertQueue.length)return;
+  const wait=gameAlertNotBefore-Date.now();
+  if(wait>0){
+    if(gameAlertTimer)clearTimeout(gameAlertTimer);
+    gameAlertTimer=setTimeout(()=>{gameAlertTimer=null;presentNextGameAlert()},wait);
+    return;
+  }
   const event=gameAlertQueue.shift(),layer=$('fxLayer');
   if(!layer)return;
   const backdrop=document.createElement('div');
@@ -388,6 +410,7 @@ function queueGameAlert(event){
     void document.body.offsetWidth;
     document.body.classList.add('bomb-screen-shake');
     setTimeout(()=>document.body.classList.remove('bomb-screen-shake'),1250);
+    gameAlertNotBefore=Math.max(gameAlertNotBefore,Date.now()+2050);
     if(event.type==='bomb-hit')showExplosion(event.playerId,event.playerName);
     else showDefuseEffect(event.playerId);
   }
@@ -578,5 +601,5 @@ async function boot(){
   setInterval(pollGame,1500);
   pollGame();
 }
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=20');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=21');
 boot();</script></body></html>
